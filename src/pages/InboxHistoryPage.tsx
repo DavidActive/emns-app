@@ -6,19 +6,19 @@ interface AlertRow {
   id: string;
   tier: 1 | 2 | 3;
   status: string;
-  alert_type: string;
+  item_type: string;
   message_body: string | null;
   gps_url: string | null;
   created_at: string;
-  enrolled_person_id: string | null;
+  person_id: string | null;
   // See TriageInbox.tsx for why this is typed loosely and normalized below.
-  enrolled_people: unknown;
+  people: unknown;
 }
 
-function getPerson(row: AlertRow): { full_name: string | null; phone_number: string | null } | null {
-  const raw = row.enrolled_people;
+function getPerson(row: AlertRow): { full_name: string | null; mobile_phone: string | null } | null {
+  const raw = row.people;
   if (!raw) return null;
-  return Array.isArray(raw) ? (raw[0] ?? null) : (raw as { full_name: string | null; phone_number: string | null });
+  return Array.isArray(raw) ? (raw[0] ?? null) : (raw as { full_name: string | null; mobile_phone: string | null });
 }
 
 function monthKey(iso: string) {
@@ -34,7 +34,7 @@ const TIER_LABELS: Record<'all' | 1 | 2 | 3, string> = {
   all: 'All Tiers',
   1: 'Tier 1 — Routine',
   2: 'Tier 2 — Elevated',
-  3: 'Tier 3 — Crisis',
+  3: 'Tier 3 — Critical',
 };
 
 function parseTierParam(value: string | null): 'all' | 1 | 2 | 3 {
@@ -70,9 +70,9 @@ export default function AlertsHistoryPage() {
   const load = () => {
     setLoading(true);
     return supabase
-      .from('alerts')
+      .from('inbox_items')
       .select(
-        'id, tier, status, alert_type, message_body, gps_url, created_at, enrolled_person_id, enrolled_people ( full_name, phone_number )'
+        'id, tier, status, item_type, message_body, gps_url, created_at, person_id, people ( full_name, mobile_phone )'
       )
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -87,8 +87,8 @@ export default function AlertsHistoryPage() {
 
   const remove = async (id: string) => {
     if (!window.confirm('Permanently remove this alert and its message history? This cannot be undone.')) return;
-    // alert_messages and escalation_log rows cascade-delete automatically (FK ON DELETE CASCADE).
-    await supabase.from('alerts').delete().eq('id', id);
+    // inbox_messages and escalations rows cascade-delete automatically (FK ON DELETE CASCADE).
+    await supabase.from('inbox_items').delete().eq('id', id);
     load();
   };
 
@@ -179,7 +179,7 @@ export default function AlertsHistoryPage() {
         {filtered.map((a) => {
           const person = getPerson(a);
           const name = person?.full_name && person.full_name !== 'Unknown' ? person.full_name : null;
-          const phone = person?.phone_number ?? null;
+          const phone = person?.mobile_phone ?? null;
           const primaryLabel = name ?? phone ?? 'Unknown sender';
           return (
             <div key={a.id} className="card" style={{ padding: 14 }}>
@@ -187,7 +187,7 @@ export default function AlertsHistoryPage() {
                 <div>
                   <span className={`tier-badge tier-${a.tier}`}>Tier {a.tier}</span>
                   <span style={{ marginLeft: 10, fontSize: 12, color: 'var(--brand-gray-600)' }}>
-                    {a.alert_type} · {new Date(a.created_at).toLocaleString()}
+                    {a.item_type} · {new Date(a.created_at).toLocaleString()}
                   </span>
                 </div>
                 <span style={{ fontSize: 12, textTransform: 'uppercase', fontWeight: 700, color: 'var(--brand-gray-600)' }}>

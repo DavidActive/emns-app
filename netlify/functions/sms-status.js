@@ -1,5 +1,5 @@
 // Twilio delivery-status callback for outbound staff replies (set per-message by send-sms.js).
-// Updates alert_messages.delivery_status so the portal can show Sent / Delivered / Failed.
+// Updates inbox_messages.delivery_status so the portal can show Sent / Delivered / Failed.
 // Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, TWILIO_AUTH_TOKEN.
 
 const { checkTwilioSignature, baseUrl } = require('../../src/server/providers/twilioSignature.cjs');
@@ -21,17 +21,17 @@ exports.handler = async (event) => {
   if (!sid || !status) return ok;
 
   const { data: msg } = await supabase
-    .from('alert_messages')
+    .from('inbox_messages')
     .update({ delivery_status: status, error_code: params.ErrorCode || null })
     .eq('twilio_sid', sid)
-    .select('alert_id')
+    .select('item_id')
     .maybeSingle();
 
   // Carrier-level STOP surfaces as 21610 on delivery too — keep the opt-out flag in sync.
   if (msg && params.ErrorCode === '21610') {
-    const { data: alert } = await supabase.from('alerts').select('enrolled_person_id').eq('id', msg.alert_id).maybeSingle();
-    if (alert?.enrolled_person_id) {
-      await supabase.from('enrolled_people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', alert.enrolled_person_id);
+    const { data: alert } = await supabase.from('inbox_items').select('person_id').eq('id', msg.item_id).maybeSingle();
+    if (alert?.person_id) {
+      await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', alert.person_id);
     }
   }
   return ok;

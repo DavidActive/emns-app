@@ -61,7 +61,7 @@ export default function SetPasswordPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--brand-navy)' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: 340, textAlign: 'center' }}>
-        <img src="/vetprotect-logo.png" alt="VetProtect" width={100} height={100} style={{ objectFit: 'contain' }} />
+        <strong style={{ fontSize: 20 }}>eMNS</strong>
         <h1 style={{ fontSize: 20, margin: '12px 0 4px' }}>Set your password</h1>
         <input
           type="password"

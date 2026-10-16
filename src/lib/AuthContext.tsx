@@ -6,8 +6,8 @@ export interface StaffProfile {
   id: string;
   organization_id: string | null;
   full_name: string | null;
-  role: 'admin' | 'staff' | 'viewer' | 'support';
-  is_global_admin: boolean;
+  role: 'admin' | 'sender' | 'operator' | 'viewer';
+  is_platform_admin: boolean;
 }
 
 interface AuthContextValue {
@@ -46,8 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     supabase
-      .from('staff_users')
-      .select('id, organization_id, full_name, role, is_global_admin')
+      .from('operators')
+      .select('id, organization_id, full_name, role, is_platform_admin')
       .eq('user_id', session.user.id)
       .maybeSingle()
       .then(({ data }) => setStaff(data as StaffProfile | null));

@@ -17,7 +17,7 @@ export async function sendSms(alertId: string, body: string, templateId?: string
     const res = await fetch('/.netlify/functions/send-sms', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ alert_id: alertId, body, template_id: templateId ?? undefined }),
+      body: JSON.stringify({ item_id: alertId, body, template_id: templateId ?? undefined }),
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, error: json.error ?? `Send failed (${res.status}).`, code: json.code };

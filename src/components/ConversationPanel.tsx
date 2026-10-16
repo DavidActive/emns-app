@@ -68,13 +68,13 @@ export default function ConversationPanel({
     // One continuous thread per person: pull messages from every alert they have ever had
     // (including resolved ones), so a new alert never starts a "blank" conversation.
     const base = supabase
-      .from('alert_messages')
+      .from('inbox_messages')
       .select(personId
-        ? 'id, direction, body, created_at, delivery_status, error_code, alerts!inner ( enrolled_person_id )'
+        ? 'id, direction, body, created_at, delivery_status, error_code, inbox_items!inner ( person_id )'
         : 'id, direction, body, created_at, delivery_status, error_code');
     const { data } = await (personId
-      ? base.eq('alerts.enrolled_person_id', personId)
-      : base.eq('alert_id', alertId)
+      ? base.eq('inbox_items.person_id', personId)
+      : base.eq('item_id', alertId)
     ).order('created_at', { ascending: true });
     setMessages((data as unknown as Message[]) ?? []);
   }, [alertId, personId]);
@@ -84,7 +84,7 @@ export default function ConversationPanel({
     loadMessages();
     const channel = supabase
       .channel(`thread-${personId ?? alertId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'alert_messages' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inbox_messages' }, () => {
         loadMessages();
       })
       .subscribe();
@@ -99,15 +99,15 @@ export default function ConversationPanel({
   // Opening the thread counts as reading it.
   useEffect(() => {
     if (!hadUnread) return;
-    const q = supabase.from('alerts').update({ unread_reply: false });
-    (personId ? q.eq('enrolled_person_id', personId) : q.eq('id', alertId)).then(() => onChanged());
+    const q = supabase.from('inbox_items').update({ unread_reply: false });
+    (personId ? q.eq('person_id', personId) : q.eq('id', alertId)).then(() => onChanged());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertId, personId]);
 
   // Pre-approved replies for this org (and org-agnostic ones), matching this alert's tier or any tier.
   useEffect(() => {
     supabase
-      .from('alert_templates')
+      .from('message_templates')
       .select('id, name, message, tier')
       .or(`organization_id.eq.${organizationId},organization_id.is.null`)
       .order('name')
@@ -153,8 +153,7 @@ export default function ConversationPanel({
     <div style={{ marginTop: 12, borderTop: '1px solid var(--brand-gray-300)', paddingTop: 12 }}>
       {tier === 3 && (
         <div style={{ background: '#fdecea', border: '1px solid var(--tier-3)', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 10 }}>
-          <strong>Tier 3 — active crisis.</strong> Texting is a bridge, not the response. Hand off to the Veterans Crisis Line
-          (988 then press 1, or text 838255) or a credentialed responder; don't be the only person on this thread.
+          <strong>Tier 3 — critical.</strong> Follow your organization's escalation procedure and call 911 for any immediate danger; don't be the only person on this thread.
         </div>
       )}
 

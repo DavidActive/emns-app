@@ -23,4 +23,4 @@ npm run check:ids              # fails if a live VetProtect identifier is presen
 - Do not point this repo at the live VetProtect Supabase project or Twilio number.
 
 ## Status
-P0 (clean fork) and P1 (provider interfaces) done. Next: baseline schema for the new Supabase project (see docs/BASELINE_SCHEMA_TODO.md).
+P0 (clean fork), P1 (provider interfaces) and the schema rename are done in code. Migrations in supabase/migrations/ are written but NOT yet applied: the emns Supabase project still has to be created. See docs/SCHEMA_RENAME_MAP.md.

@@ -1,4 +1,4 @@
-// Outbound SMS — staff reply to a veteran/supporter from the Triage Inbox.
+// Outbound SMS — staff reply to a person from the Inbox.
 // Requires: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 //
 // SECURITY: uses the service-role key, so the caller is verified here (same pattern as
@@ -6,7 +6,7 @@
 // from the alert's enrolled person, so a caller can't use this endpoint to text arbitrary numbers.
 // Caller must be staff (role admin/staff/support) of the alert's organization, or a global admin.
 //
-// Request:  POST { alert_id, body, template_id? }  + Authorization: Bearer <supabase session token>
+// Request:  POST { item_id, body, template_id? }  + Authorization: Bearer <supabase session token>
 // Response: 200 { ok:true, message_id, sid } | 4xx/5xx { error, code? }
 //
 // Sends from the org's own Twilio number (organizations.twilio_number); if
@@ -20,7 +20,7 @@ const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests
 
 const { getMessageProvider } = require('../../src/server/providers/index.cjs');
 
-const SENDER_ROLES = ['admin', 'staff', 'support'];
+const SENDER_ROLES = ['admin', 'sender', 'operator'];
 const MAX_BODY = 1600; // Twilio's hard limit per message
 
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
@@ -36,8 +36,8 @@ exports.handler = async (event) => {
   if (callerAuthError || !callerAuth?.user) return json(401, { error: 'Invalid or expired session.' });
 
   const { data: caller } = await supabase
-    .from('staff_users')
-    .select('id, organization_id, role, is_global_admin')
+    .from('operators')
+    .select('id, organization_id, role, is_platform_admin')
     .eq('user_id', callerAuth.user.id)
     .maybeSingle();
   if (!caller) return json(403, { error: 'No staff profile for this account.' });
@@ -45,32 +45,32 @@ exports.handler = async (event) => {
   // --- input ---
   let payload;
   try { payload = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid JSON.' }); }
-  const { alert_id, template_id } = payload;
+  const { item_id, template_id } = payload;
   const body = typeof payload.body === 'string' ? payload.body.trim() : '';
-  if (!alert_id) return json(400, { error: 'alert_id is required.' });
+  if (!item_id) return json(400, { error: 'item_id is required.' });
   if (!body) return json(400, { error: 'Message cannot be empty.' });
   if (body.length > MAX_BODY) return json(400, { error: `Message is too long (max ${MAX_BODY} characters).` });
 
   // --- resolve alert, org, and recipient server-side ---
   const { data: alert } = await supabase
-    .from('alerts')
-    .select('id, organization_id, status, enrolled_person_id, organizations ( twilio_number ), enrolled_people ( id, phone_number, sms_opted_out )')
-    .eq('id', alert_id)
+    .from('inbox_items')
+    .select('id, organization_id, status, person_id, organizations ( twilio_number ), people ( id, mobile_phone, sms_opted_out )')
+    .eq('id', item_id)
     .maybeSingle();
   if (!alert) return json(404, { error: 'Alert not found.' });
 
   const sameOrg = caller.organization_id && caller.organization_id === alert.organization_id;
-  if (!caller.is_global_admin && !(sameOrg && SENDER_ROLES.includes(caller.role))) {
+  if (!caller.is_platform_admin && !(sameOrg && SENDER_ROLES.includes(caller.role))) {
     return json(403, { error: 'You do not have permission to send messages for this alert.' });
   }
 
   // PostgREST returns a single object for many-to-one joins, but normalize in case it's an array.
   const one = (x) => (Array.isArray(x) ? x[0] : x);
   const org = one(alert.organizations);
-  const person = one(alert.enrolled_people);
+  const person = one(alert.people);
 
   if (!org?.twilio_number) return json(400, { error: "This organization has no Twilio number configured." });
-  if (!person?.phone_number) return json(400, { error: 'No phone number on file for this person.' });
+  if (!person?.mobile_phone) return json(400, { error: 'No phone number on file for this person.' });
   if (person.sms_opted_out) {
     return json(409, { error: 'This person has opted out of texts (replied STOP). Call them instead, or wait for them to text START.', code: 'opted_out' });
   }
@@ -83,7 +83,7 @@ exports.handler = async (event) => {
   try {
     const msg = await getMessageProvider().send({
       channel: 'sms',
-      to: person.phone_number,
+      to: person.mobile_phone,
       body,
       statusCallback,
       ...(messagingServiceSid ? { messagingServiceSid } : { from: org.twilio_number }),
@@ -96,9 +96,9 @@ exports.handler = async (event) => {
 
   // Always record the attempt so staff can see failures in the thread rather than assume delivery.
   const { data: row } = await supabase
-    .from('alert_messages')
+    .from('inbox_messages')
     .insert({
-      alert_id,
+      item_id,
       direction: 'outbound',
       body,
       sent_by: caller.id,
@@ -113,13 +113,13 @@ exports.handler = async (event) => {
   if (sendError) {
     // 21610 = recipient replied STOP at the carrier/Twilio level. Remember it so the UI locks the composer.
     if (sendError.code === 21610) {
-      await supabase.from('enrolled_people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', person.id);
-      await supabase.from('consent_log').insert({ enrolled_person_id: person.id, event: 'opt_out', method: 'twilio_21610' });
+      await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', person.id);
+      await supabase.from('consent_events').insert({ person_id: person.id, event: 'opt_out', method: 'twilio_21610' });
       return json(409, { error: 'This person has opted out of texts. Call them instead.', code: 'opted_out' });
     }
     const friendly =
       sendError.code === 21211 || sendError.code === 21614
-        ? 'That phone number can\'t receive texts. Check the number on the veteran\'s profile.'
+        ? 'That phone number can\'t receive texts. Check the number on the person\'s profile.'
         : 'The text could not be sent. Try again, or call the person directly.';
     return json(502, { error: friendly, code: sendError.code ?? 'send_failed' });
   }
@@ -128,14 +128,14 @@ exports.handler = async (event) => {
   // acknowledge every still-open alert from this person (not just the one the reply attached to)
   // and clear their unread flags.
   const now = new Date().toISOString();
-  if (alert.enrolled_person_id) {
+  if (alert.person_id) {
     await supabase
-      .from('alerts')
+      .from('inbox_items')
       .update({ status: 'acknowledged', acknowledged_at: now, acknowledged_by: caller.id })
-      .eq('enrolled_person_id', alert.enrolled_person_id)
+      .eq('person_id', alert.person_id)
       .eq('organization_id', alert.organization_id)
       .eq('status', 'open');
-    await supabase.from('alerts').update({ unread_reply: false }).eq('enrolled_person_id', alert.enrolled_person_id).eq('organization_id', alert.organization_id);
+    await supabase.from('inbox_items').update({ unread_reply: false }).eq('person_id', alert.person_id).eq('organization_id', alert.organization_id);
   } else {
     const update = { unread_reply: false };
     if (alert.status === 'open') {
@@ -143,7 +143,7 @@ exports.handler = async (event) => {
       update.acknowledged_at = now;
       update.acknowledged_by = caller.id;
     }
-    await supabase.from('alerts').update(update).eq('id', alert_id);
+    await supabase.from('inbox_items').update(update).eq('id', item_id);
   }
 
   return json(200, { ok: true, message_id: row?.id ?? null, sid });

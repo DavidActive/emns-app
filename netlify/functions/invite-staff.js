@@ -1,13 +1,13 @@
 // Staff invite flow — copied pattern from protect-activesos's invite-staff function.
-// Creates a Supabase Auth user (invite email) + staff_users row.
+// Creates a Supabase Auth user (invite email) + operators row.
 // Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 //
 // SECURITY: this uses the service-role key, which bypasses RLS entirely, so it must
 // verify the caller itself rather than trusting anything in the request body. Only an
 // existing global admin may invite someone else right now (matches the app: the Global
-// Admin page that calls this is already gated to is_global_admin in the UI, but the UI
+// Admin page that calls this is already gated to is_platform_admin in the UI, but the UI
 // gate alone doesn't protect the endpoint — anyone could POST here directly without this
-// check). Only a caller who is already a global admin can grant is_global_admin to the
+// check). Only a caller who is already a global admin can grant is_platform_admin to the
 // new user; the flag is never taken from the request body for that reason.
 
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
@@ -31,16 +31,16 @@ exports.handler = async (event) => {
   }
 
   const { data: callerStaff, error: callerStaffError } = await supabase
-    .from('staff_users')
-    .select('is_global_admin')
+    .from('operators')
+    .select('is_platform_admin')
     .eq('user_id', callerAuth.user.id)
     .maybeSingle();
 
-  if (callerStaffError || !callerStaff?.is_global_admin) {
+  if (callerStaffError || !callerStaff?.is_platform_admin) {
     return { statusCode: 403, body: JSON.stringify({ error: 'Only a global admin can invite new users.' }) };
   }
 
-  const { email, full_name, organization_id, role, is_global_admin } = JSON.parse(event.body || '{}');
+  const { email, full_name, organization_id, role, is_platform_admin } = JSON.parse(event.body || '{}');
   if (!email || !organization_id) {
     return { statusCode: 400, body: JSON.stringify({ error: 'email and organization_id are required.' }) };
   }
@@ -50,14 +50,14 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: error.message }) };
   }
 
-  const { error: insertError } = await supabase.from('staff_users').insert({
+  const { error: insertError } = await supabase.from('operators').insert({
     user_id: invited.user.id,
     organization_id,
     full_name,
-    role: role || 'staff',
+    role: role || 'operator',
     // Only ever true because the caller passed the check above — never trust the
     // request body alone for a privilege-granting flag.
-    is_global_admin: is_global_admin === true,
+    is_platform_admin: is_platform_admin === true,
   });
   if (insertError) {
     return { statusCode: 500, body: JSON.stringify({ error: insertError.message }) };

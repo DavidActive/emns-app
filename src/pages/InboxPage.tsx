@@ -10,26 +10,26 @@ interface AlertRow {
   id: string;
   tier: 1 | 2 | 3;
   status: string;
-  alert_type: string;
+  item_type: string;
   message_body: string | null;
   gps_url: string | null;
   created_at: string;
   last_inbound_at: string | null;
-  enrolled_person_id: string | null;
+  person_id: string | null;
   organization_id: string;
   unread_reply: boolean;
-  // Supabase's type inference says array, but for a many-to-one FK (alerts.enrolled_person_id
-  // -> enrolled_people.id) PostgREST actually returns a single object at runtime. Typed
+  // Supabase's type inference says array, but for a many-to-one FK (alerts.person_id
+  // -> people.id) PostgREST actually returns a single object at runtime. Typed
   // loosely here and normalized in getPerson() below to handle either shape safely.
-  enrolled_people: unknown;
+  people: unknown;
   // Most recent message on this alert (nested select, limit 1) — used for the thread preview.
-  alert_messages: LastMessage[] | null;
+  inbox_messages: LastMessage[] | null;
 }
 
-interface Person { full_name: string | null; phone_number: string | null; sms_opted_out: boolean | null }
+interface Person { full_name: string | null; mobile_phone: string | null; sms_opted_out: boolean | null }
 
 function getPerson(row: AlertRow): Person | null {
-  const raw = row.enrolled_people;
+  const raw = row.people;
   if (!raw) return null;
   return Array.isArray(raw) ? (raw[0] ?? null) : (raw as Person);
 }
@@ -56,7 +56,7 @@ function buildThreads(alerts: AlertRow[]): Thread[] {
   const groups = new Map<string, AlertRow[]>();
   for (const a of alerts) {
     // Alerts with no enrolled person can't be merged safely, so they stay on their own card.
-    const key = a.enrolled_person_id ? `p:${a.enrolled_person_id}` : `a:${a.id}`;
+    const key = a.person_id ? `p:${a.person_id}` : `a:${a.id}`;
     const list = groups.get(key);
     if (list) list.push(a); else groups.set(key, [a]);
   }
@@ -67,12 +67,12 @@ function buildThreads(alerts: AlertRow[]): Thread[] {
     const topAlert = sorted.reduce((best, a) => (a.tier >= best.tier ? a : best), sorted[0]);
     let preview: LastMessage | null = null;
     for (const a of sorted) {
-      const m = a.alert_messages?.[0];
+      const m = a.inbox_messages?.[0];
       if (m && (!preview || new Date(m.created_at) > new Date(preview.created_at))) preview = m;
     }
     threads.push({
       key,
-      personId: latest.enrolled_person_id,
+      personId: latest.person_id,
       person: sorted.map(getPerson).find(Boolean) ?? null,
       alerts: sorted,
       latest,
@@ -84,15 +84,15 @@ function buildThreads(alerts: AlertRow[]): Thread[] {
       preview,
     });
   });
-  // An unacknowledged Tier 3 (active crisis) is never allowed to sink below newer, calmer threads.
+  // An unacknowledged Tier 3 (critical) is never allowed to sink below newer, calmer threads.
   // Everything else is newest message from the person first.
   const pinned = (t: Thread) => t.tier === 3 && t.status === 'open';
   threads.sort((a, b) => Number(pinned(b)) - Number(pinned(a)) || b.lastActivity - a.lastActivity);
   return threads;
 }
 
-const CRISIS_LINE_TEXT =
-  'You are not alone. Please reach the Veterans Crisis Line now: call 988 then press 1, or text 838255. A team member is also being notified.';
+const ESCALATION_TEXT =
+  'This is an urgent message from your organization. A team member has been notified and will contact you. If you are in immediate danger, call 911.';
 
 export default function TriageInbox() {
   const { staff } = useAuth();
@@ -102,13 +102,13 @@ export default function TriageInbox() {
 
   const load = async () => {
     const { data } = await supabase
-      .from('alerts')
+      .from('inbox_items')
       .select(
-        'id, tier, status, alert_type, message_body, gps_url, created_at, last_inbound_at, enrolled_person_id, organization_id, unread_reply, enrolled_people ( full_name, phone_number, sms_opted_out ), alert_messages ( direction, body, created_at )'
+        'id, tier, status, item_type, message_body, gps_url, created_at, last_inbound_at, person_id, organization_id, unread_reply, people ( full_name, mobile_phone, sms_opted_out ), inbox_messages ( direction, body, created_at )'
       )
       .in('status', ['open', 'acknowledged'])
-      .order('created_at', { ascending: false, referencedTable: 'alert_messages' })
-      .limit(1, { referencedTable: 'alert_messages' });
+      .order('created_at', { ascending: false, referencedTable: 'inbox_messages' })
+      .limit(1, { referencedTable: 'inbox_messages' });
     setAlerts((data as unknown as AlertRow[]) ?? []);
     setLoading(false);
   };
@@ -123,8 +123,8 @@ export default function TriageInbox() {
     // Also refresh immediately whenever a Postgres change lands on alerts, for near-instant
     // updates rather than waiting up to 8s for the next poll.
     const channel = supabase
-      .channel('alerts-triage-inbox')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts' }, () => load())
+      .channel('inbox-items')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inbox_items' }, () => load())
       .subscribe();
 
     return () => {
@@ -139,14 +139,14 @@ export default function TriageInbox() {
   const acknowledge = async (t: Thread) => {
     const ids = t.alerts.filter((a) => a.status === 'open').map((a) => a.id);
     if (ids.length) {
-      await supabase.from('alerts').update({ status: 'acknowledged', acknowledged_at: new Date().toISOString(), acknowledged_by: staff?.id ?? null }).in('id', ids);
+      await supabase.from('inbox_items').update({ status: 'acknowledged', acknowledged_at: new Date().toISOString(), acknowledged_by: staff?.id ?? null }).in('id', ids);
     }
     load();
   };
 
   const resolve = async (t: Thread) => {
     const ids = t.alerts.map((a) => a.id);
-    await supabase.from('alerts').update({ status: 'resolved', resolved_at: new Date().toISOString() }).in('id', ids);
+    await supabase.from('inbox_items').update({ status: 'resolved', resolved_at: new Date().toISOString() }).in('id', ids);
     load();
   };
 
@@ -156,26 +156,26 @@ export default function TriageInbox() {
       ? `Permanently remove these ${n} open alerts and their message history? This cannot be undone.`
       : 'Permanently remove this alert and its message history? This cannot be undone.';
     if (!window.confirm(msg)) return;
-    // alert_messages and escalation_log rows cascade-delete automatically (FK ON DELETE CASCADE).
-    await supabase.from('alerts').delete().in('id', t.alerts.map((a) => a.id));
+    // inbox_messages and escalations rows cascade-delete automatically (FK ON DELETE CASCADE).
+    await supabase.from('inbox_items').delete().in('id', t.alerts.map((a) => a.id));
     load();
   };
 
-  // Sends the Veterans Crisis Line text to the person (previously this only LOGGED the text
+  // Sends the escalation notice text to the person (previously this only LOGGED the text
   // without sending it) and records the hand-off. If the text can't be sent — opted out,
   // bad number — the failure is logged and staff are told to call directly.
   const escalate = async (t: Thread) => {
     const target = t.topAlert;
-    const result = await sendSms(target.id, CRISIS_LINE_TEXT);
-    await supabase.from('escalation_log').insert({
-      alert_id: target.id,
-      escalated_to: '988_veterans_crisis_line',
+    const result = await sendSms(target.id, ESCALATION_TEXT);
+    await supabase.from('escalations').insert({
+      item_id: target.id,
+      escalated_to: 'on_call_team',
       escalated_by: staff?.id ?? null,
       outcome: result.ok ? 'hand_off_initiated' : 'hand_off_sms_failed',
       notes: result.ok ? null : result.error ?? null,
     });
     if (!result.ok) {
-      window.alert(`The crisis-line text was NOT sent: ${result.error}\n\nCall the person directly or contact the Veterans Crisis Line (988 then press 1) on their behalf.`);
+      window.alert(`The escalation text was NOT sent: ${result.error}\n\nCall the person directly or call 911 if they may be in danger on their behalf.`);
     }
     load();
   };
@@ -201,7 +201,7 @@ export default function TriageInbox() {
         {threads.map((t) => {
           const person = t.person;
           const name = person?.full_name && person.full_name !== 'Unknown' ? person.full_name : null;
-          const phone = person?.phone_number ?? null;
+          const phone = person?.mobile_phone ?? null;
           // Freeform texts have no parsed name, so lead with the phone number instead of
           // "Unknown sender" — that's the one piece of identifying info we always have.
           const primaryLabel = name ?? phone ?? 'Unknown sender';
@@ -251,7 +251,7 @@ export default function TriageInbox() {
                   onClick={() => escalate(t)}
                   style={{ background: 'var(--tier-3)', color: 'white', border: 'none', borderRadius: 6, padding: '10px 16px', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Escalate to Veterans Crisis Line
+                  Send escalation notice
                 </button>
               )}
               <button

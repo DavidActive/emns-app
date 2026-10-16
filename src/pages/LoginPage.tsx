@@ -53,8 +53,7 @@ export default function LoginPage() {
         className="card"
         style={{ width: 440, textAlign: 'center' }}
       >
-        <img src="/vetprotect-logo.png" alt="VetProtect" width={360} height={360} style={{ objectFit: 'contain' }} />
-        <h1 style={{ fontSize: 20, margin: '12px 0 4px' }}>VetProtect</h1>
+                <h1 style={{ fontSize: 20, margin: '12px 0 4px' }}>eMNS</h1>
         <p style={{ color: 'var(--brand-gray-600)', fontSize: 13, marginBottom: 20 }}>
           {mode === 'signIn' ? 'Staff & peer-support sign in' : 'Reset your password'}
         </p>

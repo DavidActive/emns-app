@@ -6,7 +6,7 @@ interface StaffRow {
   id: string;
   full_name: string | null;
   role: string;
-  is_global_admin: boolean;
+  is_platform_admin: boolean;
   organization_id: string | null;
 }
 
@@ -29,7 +29,7 @@ export default function UserAdminPage() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [organizationId, setOrganizationId] = useState('');
-  const [role, setRole] = useState<'support' | 'admin'>('support');
+  const [role, setRole] = useState<'operator' | 'sender' | 'admin'>('operator');
   const [canAddUsers, setCanAddUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -37,13 +37,13 @@ export default function UserAdminPage() {
 
   const loadStaff = () => {
     supabase
-      .from('staff_users')
-      .select('id, full_name, role, is_global_admin, organization_id')
+      .from('operators')
+      .select('id, full_name, role, is_platform_admin, organization_id')
       .then(({ data }) => setRows((data as StaffRow[]) ?? []));
   };
 
   useEffect(() => {
-    if (!staff?.is_global_admin) return;
+    if (!staff?.is_platform_admin) return;
     loadStaff();
     supabase
       .from('organizations')
@@ -76,7 +76,7 @@ export default function UserAdminPage() {
           full_name: fullName.trim() || null,
           organization_id: organizationId,
           role,
-          is_global_admin: canAddUsers,
+          is_platform_admin: canAddUsers,
         }),
       });
       const data = await res.json();
@@ -94,7 +94,7 @@ export default function UserAdminPage() {
     }
   };
 
-  if (!staff?.is_global_admin) {
+  if (!staff?.is_platform_admin) {
     return <p>Global-admin access required.</p>;
   }
 
@@ -134,8 +134,9 @@ export default function UserAdminPage() {
           </div>
           <div>
             <label style={labelStyle}>Role</label>
-            <select style={fieldStyle} value={role} onChange={(e) => setRole(e.target.value as 'support' | 'admin')}>
-              <option value="support">Application Support</option>
+            <select style={fieldStyle} value={role} onChange={(e) => setRole(e.target.value as 'operator' | 'sender' | 'admin')}>
+              <option value="operator">Operator (replies, drills)</option>
+              <option value="sender">Sender (can send real alerts)</option>
               <option value="admin">Administrators</option>
             </select>
           </div>
@@ -162,7 +163,7 @@ export default function UserAdminPage() {
             <tr key={r.id} style={{ borderBottom: '1px solid var(--brand-gray-300)' }}>
               <td style={{ padding: 10 }}>{r.full_name ?? '—'}</td>
               <td style={{ padding: 10 }}>{ROLE_LABELS[r.role] ?? r.role}</td>
-              <td style={{ padding: 10 }}>{r.is_global_admin ? 'Yes' : 'No'}</td>
+              <td style={{ padding: 10 }}>{r.is_platform_admin ? 'Yes' : 'No'}</td>
             </tr>
           ))}
         </tbody>

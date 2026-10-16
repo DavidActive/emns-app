@@ -5,11 +5,10 @@ import LoginPage from './pages/LoginPage';
 import SetPasswordPage from './pages/SetPasswordPage';
 import AppShell from './components/AppShell';
 import DashboardHome from './pages/DashboardHome';
-import TriageInbox from './pages/TriageInbox';
-import AlertsHistoryPage from './pages/AlertsHistoryPage';
-import ReportsPage from './pages/ReportsPage';
-import VeteransPage from './pages/VeteransPage';
-import VeteranEditPage from './pages/VeteranEditPage';
+import InboxPage from './pages/InboxPage';
+import InboxHistoryPage from './pages/InboxHistoryPage';
+import PeoplePage from './pages/PeoplePage';
+import PersonEditPage from './pages/PersonEditPage';
 import OrgSettingsPage from './pages/OrgSettingsPage';
 import UserAdminPage from './pages/UserAdminPage';
 
@@ -54,11 +53,10 @@ export default function App() {
         }
       >
         <Route index element={<DashboardHome />} />
-        <Route path="triage" element={<TriageInbox />} />
-        <Route path="alerts" element={<AlertsHistoryPage />} />
-        <Route path="reports" element={<ReportsPage />} />
-        <Route path="veterans" element={<VeteransPage />} />
-        <Route path="veterans/:id" element={<VeteranEditPage />} />
+        <Route path="inbox" element={<InboxPage />} />
+        <Route path="history" element={<InboxHistoryPage />} />
+        <Route path="people" element={<PeoplePage />} />
+        <Route path="people/:id" element={<PersonEditPage />} />
         <Route path="settings" element={<OrgSettingsPage />} />
         <Route path="admin/users" element={<UserAdminPage />} />
       </Route>

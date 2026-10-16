@@ -13,15 +13,15 @@ const TIER_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'Any tier' },
   { value: '1', label: 'Tier 1 · Safe check-in' },
   { value: '2', label: 'Tier 2 · Needs a look' },
-  { value: '3', label: 'Tier 3 · Crisis' },
+  { value: '3', label: 'Tier 3 · Critical' },
 ];
 
 // Pre-approved replies staff can drop into the conversation box. Editing is limited to org
-// admins / global admins because this is the wording sent to people who may be in crisis, and
-// carriers filter crisis-adjacent text aggressively (see the Twilio setup checklist).
+// admins / global admins because this is the wording sent to people during incidents, and
+// carriers filter emergency-adjacent text, so keep it plain.
 export default function TemplatesManager({ organizationId }: { organizationId: string }) {
   const { staff } = useAuth();
-  const canEdit = Boolean(staff?.is_global_admin || staff?.role === 'admin');
+  const canEdit = Boolean(staff?.is_platform_admin || staff?.role === 'admin');
   const [items, setItems] = useState<Template[]>([]);
   const [name, setName] = useState('');
   const [tier, setTier] = useState('');
@@ -31,7 +31,7 @@ export default function TemplatesManager({ organizationId }: { organizationId: s
 
   const load = useCallback(async () => {
     const { data } = await supabase
-      .from('alert_templates')
+      .from('message_templates')
       .select('id, tier, name, message')
       .eq('organization_id', organizationId)
       .order('tier', { ascending: true, nullsFirst: true })
@@ -45,7 +45,7 @@ export default function TemplatesManager({ organizationId }: { organizationId: s
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const { error: err } = await supabase.from('alert_templates').insert({
+    const { error: err } = await supabase.from('message_templates').insert({
       organization_id: organizationId,
       name: name.trim(),
       message: message.trim(),
@@ -59,7 +59,7 @@ export default function TemplatesManager({ organizationId }: { organizationId: s
 
   const remove = async (id: string) => {
     if (!window.confirm('Delete this template?')) return;
-    await supabase.from('alert_templates').delete().eq('id', id);
+    await supabase.from('message_templates').delete().eq('id', id);
     load();
   };
 
@@ -70,7 +70,7 @@ export default function TemplatesManager({ organizationId }: { organizationId: s
       <h2 style={{ marginTop: 30 }}>Reply Templates</h2>
       <p style={{ color: 'var(--brand-gray-600)', maxWidth: 620 }}>
         Approved wording staff can insert when replying from the Triage Inbox. Use <code>{'{first_name}'}</code> to
-        personalize. Every Tier 3 reply should point to the Veterans Crisis Line (988, press 1, or text 838255).
+        personalize. Every Tier 3 reply should include your organization's escalation contact or 911 for immediate danger.
       </p>
 
       {canEdit ? (

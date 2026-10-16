@@ -31,7 +31,7 @@ export default function AppShell() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <aside style={{ width: 320, background: 'var(--brand-navy)', padding: 20, color: 'white' }}>
-        <img src="/vetprotect-logo.png" alt="VetProtect" width={192} height={192} style={{ display: 'block', margin: '0 auto 20px' }} />
+        <div style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, margin: '0 0 20px' }}>eMNS</div>
         {twilioNumber && (
           <div
             style={{
@@ -51,13 +51,12 @@ export default function AppShell() {
         )}
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <NavLink to="/" end style={navItemStyle}>Dashboard</NavLink>
-          <NavLink to="/triage" style={navItemStyle}>Triage Inbox</NavLink>
-          <NavLink to="/alerts" style={navItemStyle}>Alert History</NavLink>
-          <NavLink to="/reports" style={navItemStyle}>Reports</NavLink>
-          <NavLink to="/veterans" style={navItemStyle}>Veterans / Supporters</NavLink>
+          <NavLink to="/inbox" style={navItemStyle}>Inbox</NavLink>
+          <NavLink to="/history" style={navItemStyle}>Inbox History</NavLink>
+          <NavLink to="/people" style={navItemStyle}>People</NavLink>
           <NavLink to="/settings" style={navItemStyle}>Org Settings</NavLink>
-          {staff?.is_global_admin && (
-            <NavLink to="/admin/users" style={navItemStyle}>Global Admin</NavLink>
+          {staff?.is_platform_admin && (
+            <NavLink to="/admin/users" style={navItemStyle}>Platform Admin</NavLink>
           )}
         </nav>
         <button

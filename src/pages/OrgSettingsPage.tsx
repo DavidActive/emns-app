@@ -8,7 +8,6 @@ interface Org {
   name: string;
   slug: string;
   twilio_number: string | null;
-  sponsor_text: string | null;
 }
 
 interface TierRule {
@@ -18,7 +17,7 @@ interface TierRule {
   notes: string | null;
 }
 
-const TIER_LABELS: Record<number, string> = { 3: 'Tier 3 · Crisis', 1: 'Tier 1 · Safe check-in' };
+const TIER_LABELS: Record<number, string> = { 3: 'Tier 3 · Critical', 1: 'Tier 1 · Safe check-in' };
 
 export default function OrgSettingsPage() {
   const { staff } = useAuth();
@@ -33,7 +32,7 @@ export default function OrgSettingsPage() {
     if (!staff?.organization_id) return;
     supabase
       .from('organizations')
-      .select('id, name, slug, twilio_number, sponsor_text')
+      .select('id, name, slug, twilio_number')
       .eq('id', staff.organization_id)
       .maybeSingle()
       .then(({ data }) => setOrg(data as Org | null));
@@ -42,7 +41,7 @@ export default function OrgSettingsPage() {
 
   const loadRules = async (orgId: string) => {
     const { data } = await supabase
-      .from('tier_rules')
+      .from('priority_rules')
       .select('id, keyword, tier, notes')
       .eq('organization_id', orgId)
       .order('tier', { ascending: false })
@@ -55,7 +54,7 @@ export default function OrgSettingsPage() {
     if (!org || !newKeyword.trim()) return;
     setSaving(true);
     setRuleError(null);
-    const { error } = await supabase.from('tier_rules').insert({
+    const { error } = await supabase.from('priority_rules').insert({
       organization_id: org.id,
       keyword: newKeyword.trim().toLowerCase(),
       tier: newTier,
@@ -71,7 +70,7 @@ export default function OrgSettingsPage() {
 
   const removeRule = async (id: string) => {
     if (!org) return;
-    await supabase.from('tier_rules').delete().eq('id', id);
+    await supabase.from('priority_rules').delete().eq('id', id);
     loadRules(org.id);
   };
 
@@ -84,13 +83,12 @@ export default function OrgSettingsPage() {
         <p><strong>Name:</strong> {org.name}</p>
         <p><strong>Slug:</strong> {org.slug}</p>
         <p><strong>Twilio number (outbound):</strong> {org.twilio_number ?? 'Not yet registered for outbound sends'}</p>
-        <p><strong>Sponsor text:</strong> {org.sponsor_text ?? '—'}</p>
       </div>
 
-      <h2 style={{ marginTop: 30 }}>Crisis Keywords</h2>
+      <h2 style={{ marginTop: 30 }}>Priority Keywords</h2>
       <p style={{ color: 'var(--brand-gray-600)', maxWidth: 620 }}>
         Words or phrases below apply to <em>both</em> plain text messages and the reason field of Active SOS App
-        alerts — so a word like "relapse" gets the same tier no matter which way someone sends it. A match only
+        alerts — so a word like "evacuate" gets the same tier no matter which way someone sends it. A match only
         ever raises the tier; it can't downgrade an SOS button press.
       </p>
       <form onSubmit={addRule} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0' }}>
@@ -107,7 +105,7 @@ export default function OrgSettingsPage() {
           onChange={(e) => setNewTier(Number(e.target.value) as 1 | 3)}
           style={{ padding: 8, borderRadius: 6, border: '1px solid var(--brand-gray-300)' }}
         >
-          <option value={3}>Tier 3 · Crisis</option>
+          <option value={3}>Tier 3 · Critical</option>
           <option value={1}>Tier 1 · Safe check-in</option>
         </select>
         <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Adding…' : 'Add keyword'}</button>
