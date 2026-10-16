@@ -113,7 +113,7 @@ exports.handler = async (event) => {
   if (sendError) {
     // 21610 = recipient replied STOP at the carrier/Twilio level. Remember it so the UI locks the composer.
     if (sendError.code === 21610) {
-      await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', person.id);
+      await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString(), consent_status: 'withdrawn' }).eq('id', person.id);
       await supabase.from('consent_events').insert({ person_id: person.id, event: 'opt_out', method: 'twilio_21610' });
       return json(409, { error: 'This person has opted out of texts. Call them instead.', code: 'opted_out' });
     }

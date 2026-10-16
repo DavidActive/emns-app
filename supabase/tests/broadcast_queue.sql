@@ -8,8 +8,8 @@ declare
 begin
   insert into organizations (id,name,slug) values (o,'Bcast Test','bcast-test');
   insert into groups (organization_id,name) values (o,'All') returning id into g;
-  insert into people (organization_id, full_name, mobile_phone, sms_opted_out)
-    select o, 'P'||i, '+1555'||lpad(i::text,7,'0'), (i % 100 = 0) from generate_series(1,5000) i;
+  insert into people (organization_id, full_name, mobile_phone, sms_opted_out, consent_status)
+    select o, 'P'||i, '+1555'||lpad(i::text,7,'0'), (i % 100 = 0), 'consented' from generate_series(1,5000) i;
   insert into group_members (group_id, person_id) select g, id from people where organization_id = o;
 
   ev := public.create_notification_event(o,'drill','Test drill. Reply SAFE.',array[g],null,true,null,'idem-1');

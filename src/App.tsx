@@ -14,6 +14,10 @@ import GroupsPage from './pages/GroupsPage';
 import GroupDetailPage from './pages/GroupDetailPage';
 import OrgSettingsPage from './pages/OrgSettingsPage';
 import UserAdminPage from './pages/UserAdminPage';
+import EnrollPage from './pages/EnrollPage';
+import ScenariosPage from './pages/ScenariosPage';
+import ComposePage from './pages/ComposePage';
+import EventsPage from './pages/EventsPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
@@ -47,6 +51,7 @@ export default function App() {
       <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/set-password" element={<SetPasswordPage />} />
+      <Route path="/enroll/:token" element={<EnrollPage />} />
       <Route
         path="/"
         element={
@@ -63,6 +68,9 @@ export default function App() {
         <Route path="people/:id" element={<PersonEditPage />} />
         <Route path="groups" element={<GroupsPage />} />
         <Route path="groups/:id" element={<GroupDetailPage />} />
+        <Route path="send" element={<ComposePage />} />
+        <Route path="scenarios" element={<ScenariosPage />} />
+        <Route path="events" element={<EventsPage />} />
         <Route path="settings" element={<OrgSettingsPage />} />
         <Route path="admin/users" element={<UserAdminPage />} />
       </Route>

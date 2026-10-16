@@ -66,7 +66,7 @@ async function runWorker(o) {
       result = { p_outcome: c.outcome, p_error_code: c.code || null, p_error_message: String(err && err.message || err).slice(0, 500) };
       if (c.optOut) {
         stats.optedOut++;
-        await db.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date(now()).toISOString() }).eq('id', row.person_id);
+        await db.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date(now()).toISOString(), consent_status: 'withdrawn' }).eq('id', row.person_id);
       }
     }
     if (shouldCrash()) { stats.crashed = true; return; } // died after the carrier call, before recording

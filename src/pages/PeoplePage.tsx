@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/AuthContext';
 import { canEditRoster } from '../lib/permissions';
+import { callFunction } from '../lib/api';
 
 interface PersonRow {
   id: string;
@@ -12,6 +13,7 @@ interface PersonRow {
   email: string | null;
   is_active: boolean;
   sms_opted_out: boolean;
+  consent_status: 'pending' | 'consented' | 'withdrawn';
 }
 interface GroupOpt { id: string; name: string }
 
@@ -27,11 +29,14 @@ export default function PeoplePage() {
   const [query, setQuery] = useState('');
   const [groupId, setGroupId] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
+  const [consent, setConsent] = useState<'all' | 'pending' | 'consented' | 'withdrawn'>('all');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     supabase
       .from('people')
-      .select('id, full_name, employee_id, mobile_phone, email, is_active, sms_opted_out')
+      .select('id, full_name, employee_id, mobile_phone, email, is_active, sms_opted_out, consent_status')
       .order('full_name')
       .limit(10000)
       .then(({ data }) => setPeople((data as PersonRow[]) ?? []));
@@ -49,12 +54,33 @@ export default function PeoplePage() {
     return people.filter((p) => {
       if (status === 'active' && !p.is_active) return false;
       if (status === 'inactive' && p.is_active) return false;
+      if (consent !== 'all' && p.consent_status !== consent) return false;
       if (groupId && !(membership.get(p.id) ?? []).includes(groupId)) return false;
       if (!q) return true;
       return p.full_name.toLowerCase().includes(q) || (p.employee_id ?? '').toLowerCase().includes(q) ||
         p.mobile_phone.includes(q) || (p.email ?? '').toLowerCase().includes(q);
     });
-  }, [people, query, groupId, status, membership]);
+  }, [people, query, groupId, status, consent, membership]);
+
+  const downloadInvites = async () => {
+    const targets = rows.filter((p) => p.is_active && p.consent_status !== 'consented');
+    if (targets.length === 0) { setMsg('Everyone shown has already agreed to texts.'); return; }
+    if (!window.confirm(`Create one-time enrollment links for ${targets.length} people? Any unused link they already have is replaced. The file you download contains private links: send each person only their own.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      const all: { full_name: string; email: string | null; mobile_phone: string; link: string }[] = [];
+      for (let i = 0; i < targets.length; i += 1000) {
+        const r = await callFunction<{ invites: typeof all }>('create-invites', { person_ids: targets.slice(i, i + 1000).map((p) => p.id) });
+        all.push(...r.invites);
+      }
+      const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`;
+      const csv = ['name,email,phone,link', ...all.map((r) => [esc(r.full_name), esc(r.email), esc(r.mobile_phone), esc(r.link)].join(','))].join('\r\n');
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'enrollment-links.csv'; a.click(); URL.revokeObjectURL(url);
+      setMsg(`Created ${all.length} links (30 days). The file was downloaded. Links cannot be shown again.`);
+    } catch (e) { setMsg((e as Error).message); }
+    setBusy(false);
+  };
 
   return (
     <div>
@@ -62,6 +88,7 @@ export default function PeoplePage() {
         <h1>People</h1>
         {canEdit && (
           <div style={{ display: 'flex', gap: 10 }}>
+            <button disabled={busy} onClick={downloadInvites} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>{busy ? 'Working…' : 'Download invite links'}</button>
             <button onClick={() => navigate('/people/import')} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>Import CSV</button>
             <button className="btn-primary" onClick={() => navigate('/people/new')}>+ Add person</button>
           </div>
@@ -79,8 +106,12 @@ export default function PeoplePage() {
         <select style={control} value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive' | 'all')}>
           <option value="active">Active</option><option value="inactive">Inactive</option><option value="all">All statuses</option>
         </select>
+        <select style={control} value={consent} onChange={(e) => setConsent(e.target.value as typeof consent)}>
+          <option value="all">All consent states</option><option value="pending">Not yet agreed</option><option value="consented">Agreed to texts</option><option value="withdrawn">Withdrawn (STOP)</option>
+        </select>
         <span style={{ alignSelf: 'center', fontSize: 13, color: 'var(--brand-gray-600)' }}>{rows.length} of {people.length}</span>
       </div>
+      {msg && <p role="status" style={{ background: 'var(--brand-teal-light)', padding: 10, borderRadius: 6 }}>{msg}</p>}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
         <thead>
           <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--brand-gray-300)' }}>
@@ -88,7 +119,7 @@ export default function PeoplePage() {
             <th style={{ padding: 10 }}>Employee ID</th>
             <th style={{ padding: 10 }}>Mobile phone</th>
             <th style={{ padding: 10 }}>Groups</th>
-            <th style={{ padding: 10 }}>Texts</th>
+            <th style={{ padding: 10 }}>Text consent</th>
             <th style={{ padding: 10 }}>Status</th>
           </tr>
         </thead>
@@ -99,7 +130,7 @@ export default function PeoplePage() {
               <td style={{ padding: 10 }}>{p.employee_id ?? '—'}</td>
               <td style={{ padding: 10 }}>{p.mobile_phone}</td>
               <td style={{ padding: 10, fontSize: 13 }}>{(membership.get(p.id) ?? []).map((g) => groupName.get(g)).filter(Boolean).join(', ') || '—'}</td>
-              <td style={{ padding: 10 }}>{p.sms_opted_out ? 'Opted out' : 'OK'}</td>
+              <td style={{ padding: 10 }}>{p.consent_status === 'consented' && !p.sms_opted_out ? 'Agreed' : p.consent_status === 'withdrawn' || p.sms_opted_out ? 'Opted out' : 'Not yet agreed'}</td>
               <td style={{ padding: 10 }}>{p.is_active ? 'Active' : 'Inactive'}</td>
             </tr>
           ))}

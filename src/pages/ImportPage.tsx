@@ -79,6 +79,9 @@ export default function ImportPage() {
         <span style={{ fontSize: 12, color: 'var(--brand-gray-600)' }}>Columns: employee_id, full_name (or first_name + last_name), mobile_phone, email, groups (separate with ;)</span>
       </div>
       {busy && <p>Working…</p>}
+      <p style={{ background: 'var(--brand-teal-light)', padding: 10, borderRadius: 6, fontSize: 14 }}>
+        Importing a roster does not give anyone consent to be texted. New people are marked <strong>not yet agreed</strong> and receive nothing until they enroll themselves. After importing, use <strong>Download invite links</strong> on the People page.
+      </p>
       {error && <p style={{ color: 'var(--tier-3)' }}>{error}</p>}
       {notes.map((n) => <p key={n} style={{ fontSize: 13, color: 'var(--brand-gray-600)' }}>{n}</p>)}
 

@@ -144,7 +144,7 @@ const THREAD_WINDOW_HOURS = Number(process.env.EMNS_THREAD_WINDOW_HOURS ?? 72);
 // opt-out here: a bare "end" from someone in distress should reach a human, not vanish silently.
 const OPT_OUT_WORDS = new Set(['stop', 'stopall', 'unsubscribe', 'cancel']);
 const OPT_IN_WORDS = new Set(['start', 'unstop']);
-const normalizeKeyword = (t) => (t || '').trim().toLowerCase().replace(/[.!\s]+$/g, '');
+const normalizeKeyword = (t) => (t || '').trim().toLowerCase().replace(/[.!\s]+$/g, '').replace(/\s+/g, ''); // 'STOP ALL' -> 'stopall'
 
 const EMPTY_TWIML = { statusCode: 200, headers: { 'Content-Type': 'text/xml' }, body: '<Response></Response>' };
 
@@ -245,13 +245,13 @@ exports.handler = async (event) => {
   if (!isStructured) {
     const kw = normalizeKeyword(body);
     if (OPT_OUT_WORDS.has(kw)) {
-      await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', person.id);
+      await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString(), consent_status: 'withdrawn' }).eq('id', person.id);
       await supabase.from('consent_events').insert({ person_id: person.id, event: 'opt_out', method: 'sms_keyword_stop' });
       return EMPTY_TWIML; // Twilio sends the standard STOP confirmation itself
     }
     if (OPT_IN_WORDS.has(kw)) {
-      await supabase.from('people').update({ sms_opted_out: false, sms_opted_out_at: null }).eq('id', person.id);
-      await supabase.from('consent_events').insert({ person_id: person.id, event: 'opt_in', method: 'sms_keyword_start' });
+      await supabase.from('people').update({ sms_opted_out: false, sms_opted_out_at: null, consent_status: 'consented', consented_at: new Date().toISOString(), consent_method: 'sms_keyword_start' }).eq('id', person.id);
+      await supabase.from('consent_events').insert({ person_id: person.id, event: 'opt_in', method: 'sms_keyword_start', consent_text: 'Person texted START to the eMNS number.', text_version: 'sms_keyword_start' });
       return EMPTY_TWIML;
     }
   }

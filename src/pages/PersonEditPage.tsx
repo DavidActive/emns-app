@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext';
 import { canEditRoster } from '../lib/permissions';
 import { normalizePhone } from '../lib/rosterCore.mjs';
 import PersonRelations from '../components/PersonRelations';
+import { callFunction } from '../lib/api';
 
 interface PersonForm {
   full_name: string;
@@ -39,13 +40,16 @@ export default function PersonEditPage() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [consent, setConsent] = useState<{ status: string; at: string | null; method: string | null; optedOut: boolean } | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [linkMsg, setLinkMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (isNew) return;
     supabase
       .from('people')
       .select(
-        'full_name, employee_id, mobile_phone, email, notes, is_active'
+        'full_name, employee_id, mobile_phone, email, notes, is_active, consent_status, consented_at, consent_method, sms_opted_out'
       )
       .eq('id', id)
       .single()
@@ -63,9 +67,18 @@ export default function PersonEditPage() {
           notes: data.notes ?? '',
           is_active: data.is_active ?? true,
         });
+        setConsent({ status: data.consent_status, at: data.consented_at, method: data.consent_method, optedOut: !!data.sms_opted_out });
         setLoading(false);
       });
   }, [id, isNew]);
+
+  const makeLink = async () => {
+    setLinkMsg(null); setLink(null);
+    try {
+      const r = await callFunction<{ invites: { link: string }[] }>('create-invites', { person_ids: [id] });
+      if (r.invites[0]) setLink(r.invites[0].link); else setLinkMsg('This person has already agreed to texts.');
+    } catch (e) { setLinkMsg((e as Error).message); }
+  };
 
   const set = <K extends keyof PersonForm>(key: K, value: PersonForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -163,6 +176,26 @@ export default function PersonEditPage() {
           <label style={labelStyle}>Notes</label>
           <textarea style={{ ...fieldStyle, minHeight: 80, fontFamily: 'inherit' }} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
         </div>
+
+        {!isNew && consent && (
+          <div style={{ background: 'var(--brand-gray-100)', padding: 12, borderRadius: 6 }}>
+            <strong>Text consent: </strong>
+            {consent.status === 'consented' && !consent.optedOut ? `Agreed${consent.at ? ' on ' + new Date(consent.at).toLocaleDateString() : ''}${consent.method ? ' (' + consent.method.replace(/_/g, ' ') + ')' : ''}`
+              : consent.status === 'withdrawn' || consent.optedOut ? 'Opted out (replied STOP). They can reply START to turn texts back on.' : 'Not yet agreed. They will not receive texts until they do.'}
+            {canEdit && consent.status !== 'consented' && (
+              <div style={{ marginTop: 8 }}>
+                <button onClick={makeLink}>Create enrollment link</button>
+                {linkMsg && <span style={{ marginLeft: 8 }}>{linkMsg}</span>}
+                {link && (
+                  <div style={{ marginTop: 8 }}>
+                    <input readOnly value={link} onFocus={(e) => e.target.select()} style={{ width: '100%', padding: 6 }} />
+                    <small>One-time link, valid 30 days. Send it only to this person. It will not be shown again.</small>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ borderTop: '1px solid var(--brand-gray-300)', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}>

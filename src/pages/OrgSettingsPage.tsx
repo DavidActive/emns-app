@@ -8,6 +8,7 @@ interface Org {
   name: string;
   slug: string;
   twilio_number: string | null;
+  settings: { drill_tag?: string; test_tag?: string } | null;
 }
 
 interface TierRule {
@@ -27,15 +28,23 @@ export default function OrgSettingsPage() {
   const [newTier, setNewTier] = useState<1 | 3>(3);
   const [saving, setSaving] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
+  const [drillTag, setDrillTag] = useState('DRILL');
+  const [testTag, setTestTag] = useState('TEST');
+  const [tagMsg, setTagMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!staff?.organization_id) return;
     supabase
       .from('organizations')
-      .select('id, name, slug, twilio_number')
+      .select('id, name, slug, twilio_number, settings')
       .eq('id', staff.organization_id)
       .maybeSingle()
-      .then(({ data }) => setOrg(data as Org | null));
+      .then(({ data }) => {
+        const o = data as Org | null;
+        setOrg(o);
+        setDrillTag(o?.settings?.drill_tag ?? 'DRILL');
+        setTestTag(o?.settings?.test_tag ?? 'TEST');
+      });
     loadRules(staff.organization_id);
   }, [staff]);
 
@@ -74,6 +83,16 @@ export default function OrgSettingsPage() {
     loadRules(org.id);
   };
 
+  const cleanTag = (t: string, fb: string) => t.toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 16) || fb;
+  const saveTags = async () => {
+    if (!org) return;
+    const settings = { ...(org.settings ?? {}), drill_tag: cleanTag(drillTag, 'DRILL'), test_tag: cleanTag(testTag, 'TEST') };
+    const { error } = await supabase.from('organizations').update({ settings }).eq('id', org.id);
+    if (error) { setTagMsg(error.message); return; }
+    setOrg({ ...org, settings }); setDrillTag(settings.drill_tag); setTestTag(settings.test_tag);
+    setTagMsg('Saved.');
+  };
+
   if (!org) return <p>No organization assigned to your account yet.</p>;
 
   return (
@@ -84,6 +103,18 @@ export default function OrgSettingsPage() {
         <p><strong>Slug:</strong> {org.slug}</p>
         <p><strong>Twilio number (outbound):</strong> {org.twilio_number ?? 'Not yet registered for outbound sends'}</p>
       </div>
+
+      {staff?.role === 'admin' || staff?.is_platform_admin ? (
+        <>
+          <h2 style={{ marginTop: 30 }}>Drill and test labels</h2>
+          <div className="card" style={{ maxWidth: 480 }}>
+            <p style={{ color: 'var(--brand-gray-600)', marginTop: 0 }}>Every drill and test text starts with one of these labels in [brackets] so nobody mistakes it for a real emergency. Letters, numbers and spaces only, up to 16 characters.</p>
+            <label>Drill label <input value={drillTag} maxLength={16} onChange={(e) => setDrillTag(e.target.value)} style={{ padding: 6 }} /></label><br /><br />
+            <label>Test label <input value={testTag} maxLength={16} onChange={(e) => setTestTag(e.target.value)} style={{ padding: 6 }} /></label><br /><br />
+            <button className="btn-primary" onClick={saveTags}>Save labels</button> {tagMsg && <span role="status">{tagMsg}</span>}
+          </div>
+        </>
+      ) : null}
 
       <h2 style={{ marginTop: 30 }}>Priority Keywords</h2>
       <p style={{ color: 'var(--brand-gray-600)', maxWidth: 620 }}>

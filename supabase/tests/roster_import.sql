@@ -57,6 +57,10 @@ begin
   out := array_append(out, '13 matched by phone and renamed: '||v||case when v='No Emp Updated' then ' (ok)' else ' (FAIL)' end);
   select count(*) into n from group_members gm join groups g on g.id = gm.group_id where g.organization_id = oa;
   out := array_append(out, '14 memberships created (expect 3): '||n||case when n=3 then ' (ok)' else ' (FAIL)' end);
+  select count(*) into n from people where organization_id = oa and employee_id = 'E3' and consent_status = 'pending' and consented_at is null;
+  out := array_append(out, '14b imported new person is consent-pending (expect 1): '||n||case when n=1 then ' (ok)' else ' (FAIL)' end);
+  select count(*) into n from consent_events ce join people p on p.id = ce.person_id where p.organization_id = oa and p.employee_id = 'E3';
+  out := array_append(out, '14c import recorded no consent event (expect 0): '||n||case when n=0 then ' (ok)' else ' (FAIL)' end);
 
   res2 := public.apply_roster_import($j$[{"employee_id":"E1","full_name":"Existing One","mobile_phone":"+15550001001","groups":"Alpha;Bravo"}]$j$::jsonb, 'again.csv', false);
   out := array_append(out, '15 re-import is idempotent: '||(res2->'rows'->0->>'action')||case when res2->'rows'->0->>'action'='unchanged' then ' (ok)' else ' (FAIL)' end);
