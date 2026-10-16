@@ -27,7 +27,7 @@ function setup({ info = VALID, rec = REC, provider } = {}) {
 test('consent text names the organization and has every required disclosure', () => {
   const t = consentText('Acme Hospital');
   for (const must of ['from Acme Hospital through the Active SOS eMNS service', 'Calm Water Trading, LLC dba Active SOS', 'Message frequency varies',
-    'Message and data rates may apply', 'Consent is not a condition of any purchase', 'Reply STOP to opt out', 'HELP for help', 'Privacy Policy and SMS Terms']) {
+    'Message and data rates may apply', 'Consent is not a condition of any purchase', 'Reply STOP to opt out', 'HELP for help', 'No mobile information will be shared with third parties or affiliates for marketing or promotional purposes', 'Privacy Policy and SMS Terms']) {
     assert.ok(t.includes(must), must);
   }
   assert.equal(confirmationMessage('Acme Hospital'),
