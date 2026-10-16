@@ -6,6 +6,7 @@
 
 const { checkTwilioSignature, baseUrl } = require('../../src/server/providers/twilioSignature.cjs');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
+const { classifyReply } = require('../../src/server/replies/classifyReply.cjs');
 
 
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
@@ -253,6 +254,23 @@ exports.handler = async (event) => {
       await supabase.from('people').update({ sms_opted_out: false, sms_opted_out_at: null, consent_status: 'consented', consented_at: new Date().toISOString(), consent_method: 'sms_keyword_start' }).eq('id', person.id);
       await supabase.from('consent_events').insert({ person_id: person.id, event: 'opt_in', method: 'sms_keyword_start', consent_text: 'Person texted START to the eMNS number.', text_version: 'sms_keyword_start' });
       return EMPTY_TWIML;
+    }
+  }
+
+  // --- P7: match a plain reply to the person's most recent notification that asked for an acknowledgement ---
+  // SAFE: recorded and done (no triage item, so a 5,000-person drill does not flood the inbox).
+  // SOS: recorded AND forced to a critical triage item. Anything else: recorded, then triaged as usual.
+  // If nothing matches (no open event for this person), the existing behavior below is unchanged.
+  if (!isStructured) {
+    const reply = classifyReply(body);
+    const { data: ack, error: ackError } = await supabase.rpc('record_acknowledgement', {
+      p_org: org.id, p_person: person.id, p_response: reply.response, p_text: body, p_message_sid: params.get('MessageSid') || null,
+    });
+    if (ackError) console.error('sms-webhook: record_acknowledgement failed', ackError);
+    else if (ack && ack.matched) {
+      if (ack.duplicate) return EMPTY_TWIML;
+      if (reply.response === 'SAFE') return EMPTY_TWIML;
+      if (reply.response === 'SOS') { classified.tier = 3; classified.item_type = 'SOS'; }
     }
   }
 

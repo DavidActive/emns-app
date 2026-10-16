@@ -18,6 +18,7 @@ import EnrollPage from './pages/EnrollPage';
 import ScenariosPage from './pages/ScenariosPage';
 import ComposePage from './pages/ComposePage';
 import EventsPage from './pages/EventsPage';
+import RollCallPage from './pages/RollCallPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="send" element={<ComposePage />} />
         <Route path="scenarios" element={<ScenariosPage />} />
         <Route path="events" element={<EventsPage />} />
+        <Route path="events/:id" element={<RollCallPage />} />
         <Route path="settings" element={<OrgSettingsPage />} />
         <Route path="admin/users" element={<UserAdminPage />} />
       </Route>

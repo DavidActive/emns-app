@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 interface Ev {
@@ -30,10 +31,10 @@ export default function EventsPage() {
       <div className="card" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead><tr style={{ textAlign: 'left' }}>
-            {['When', 'Type', 'By', 'Status', 'Waiting', 'Sent', 'Delivered', 'Not delivered', 'Skipped'].map((h) => <th key={h} style={{ padding: 6 }}>{h}</th>)}
+            {['When', 'Type', 'By', 'Status', 'Waiting', 'Sent', 'Delivered', 'Not delivered', 'Skipped', 'Roll-call'].map((h) => <th key={h} style={{ padding: 6 }}>{h}</th>)}
           </tr></thead>
           <tbody>
-            {events.length === 0 && <tr><td colSpan={9} style={{ padding: 10 }}>Nothing has been sent yet.</td></tr>}
+            {events.length === 0 && <tr><td colSpan={10} style={{ padding: 10 }}>Nothing has been sent yet.</td></tr>}
             {events.map((e) => (
               <tr key={e.id} style={{ borderTop: '1px solid var(--brand-gray-300)' }}>
                 <td style={{ padding: 6 }}>{new Date(e.created_at).toLocaleString()}</td>
@@ -45,6 +46,7 @@ export default function EventsPage() {
                 <td style={{ padding: 6 }}>{e.delivered}</td>
                 <td style={{ padding: 6 }}>{e.undelivered + e.failed}</td>
                 <td style={{ padding: 6 }}>{e.skipped}</td>
+                <td style={{ padding: 6 }}><Link to={`/events/${e.id}`}>Open</Link></td>
               </tr>
             ))}
           </tbody>
