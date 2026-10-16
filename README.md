@@ -21,6 +21,7 @@ npm run check:ids              # fails if a live VetProtect identifier is presen
 - Message provider defaults to `mock`. Real sends need `EMNS_MESSAGE_PROVIDER=twilio` AND `EMNS_ALLOW_REAL_SEND=true`.
 - Twilio signature enforcement is ON unless `TWILIO_ENFORCE_SIGNATURE=false`.
 - Do not point this repo at the live VetProtect Supabase project or Twilio number.
+- Migrations apply in filename order; the third file holds explicit grants (auto-expose is off on the emns project).
 
 ## Status
-P0 (clean fork), P1 (provider interfaces) and the schema rename are done in code. Migrations in supabase/migrations/ are written but NOT yet applied: the emns Supabase project still has to be created. See docs/SCHEMA_RENAME_MAP.md.
+P0, P1 and the schema rename are done. The emns Supabase project (idysicueuqwuogouikdd, us-east-1) has migrations 0001-0004 applied and passes supabase/tests/tenant_isolation.sql. Next: first organization + admin user, then P2+. See docs/SCHEMA_RENAME_MAP.md.
