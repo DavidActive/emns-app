@@ -27,7 +27,10 @@ begin
     if (r->>'matched') <> 'true' then raise exception 'reply % did not match', i; end if;
   end loop;
 
-  rc := public.event_roll_call(ev1);
+  perform set_config('request.jwt.claim.sub', u::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub',u,'role','authenticated')::text, true);
+  set local role authenticated; rc := public.event_roll_call(ev1); reset role;
+  if rc is null then raise exception 'roll-call came back empty for a member of the organization'; end if;
   out := array_append(out, '2 counts: '||(rc->'counts')::text||case when (rc->'counts'->>'targeted')::int=100 and (rc->'counts'->>'responded')::int=80 and (rc->'counts'->>'unaccounted')::int=20
         and (rc->'counts'->>'sos')::int=1 and (rc->'counts'->>'replied')::int=8 and (rc->'counts'->>'safe')::int=71 and (rc->'counts'->>'not_contacted')::int=1 then ' (ok)' else ' (FAIL)' end);
   select array_agg(id) into expected from people where organization_id=o and full_name between 'P081' and 'P100';
@@ -46,17 +49,20 @@ begin
   -- SOS is sticky: a later SAFE does not clear it.
   select id into pid from people where organization_id=o and full_name='P007';
   perform public.record_acknowledgement(o, pid, 'SAFE', 'actually fine', 'SM7b');
-  rc := public.event_roll_call(ev1);
+  perform set_config('request.jwt.claim.sub', u::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub',u,'role','authenticated')::text, true);
+  set local role authenticated; rc := public.event_roll_call(ev1); reset role;
+  if rc is null then raise exception 'roll-call came back empty for a member of the organization'; end if;
   out := array_append(out, '7 SOS stays SOS after a later SAFE: '||(rc->'counts'->>'sos')||case when (rc->'counts'->>'sos')::int=1 then ' (ok)' else ' (FAIL)' end);
 
   -- Most recent event requiring an acknowledgement wins; an event that does not require one is ignored.
   r := public.create_notification_event(o,'test','Active SOS eMNS: [TEST] x.',array[g],null,false,null,'rc-2'); ev2 := (r->>'event_id')::uuid;
-  update notification_deliveries set status='sent' where event_id=ev2;
+  update notification_deliveries set status='sent' where event_id=ev2 and status='queued';
   select id into pid from people where organization_id=o and full_name='P090';
   r := public.record_acknowledgement(o, pid, 'SAFE', 'late', 'SM90');
   out := array_append(out, '8 reply skips the newer no-ack event and attaches to the older ack event: '||case when (r->>'event_id')::uuid=ev1 then 'ev1 (ok)' else 'WRONG (FAIL)' end);
   r := public.create_notification_event(o,'drill','Active SOS eMNS: [DRILL] y.',array[g],null,true,null,'rc-3'); ev3 := (r->>'event_id')::uuid;
-  update notification_deliveries set status='sent' where event_id=ev3;
+  update notification_deliveries set status='sent' where event_id=ev3 and status='queued';
   select id into pid from people where organization_id=o and full_name='P091';
   r := public.record_acknowledgement(o, pid, 'SAFE', 'now', 'SM91');
   out := array_append(out, '9 with two open ack events the most recent is chosen: '||case when (r->>'event_id')::uuid=ev3 then 'ev3 (ok)' else 'WRONG (FAIL)' end);
