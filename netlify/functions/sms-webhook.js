@@ -178,7 +178,7 @@ exports.handler = async (event) => {
   const params = new URLSearchParams(rawBody);
 
   const sig = checkTwilioSignature(event, Object.fromEntries(params), 'sms-webhook');
-  if (sig.reject) return { statusCode: 403, body: `Invalid signature | TEMP-DIAG ${sig.diag}` }; // TODO remove the diag once inbound works
+  if (sig.reject) return { statusCode: 403, body: 'Invalid signature' };
 
   const from = params.get('From');
   const to = params.get('To'); // organization's Twilio number
