@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/AuthContext';
+import { canEditRoster } from '../lib/permissions';
+import { normalizePhone } from '../lib/rosterCore.mjs';
+import PersonRelations from '../components/PersonRelations';
 
 interface PersonForm {
   full_name: string;
@@ -30,6 +33,7 @@ export default function PersonEditPage() {
   const isNew = id === 'new';
   const navigate = useNavigate();
   const { staff } = useAuth();
+  const canEdit = canEditRoster(staff);
 
   const [form, setForm] = useState<PersonForm>(BLANK);
   const [loading, setLoading] = useState(!isNew);
@@ -71,10 +75,15 @@ export default function PersonEditPage() {
       setError('Name and phone number are required.');
       return;
     }
+    const phone = normalizePhone(form.mobile_phone);
+    if (!phone) {
+      setError('Enter a valid mobile number, for example +15555550123 or (555) 555-0123.');
+      return;
+    }
     setSaving(true);
     const payload = {
       full_name: form.full_name.trim(),
-      mobile_phone: form.mobile_phone.trim(),
+      mobile_phone: phone,
       email: form.email.trim() || null,
       employee_id: form.employee_id.trim() || null,
       notes: form.notes.trim() || null,
@@ -93,7 +102,7 @@ export default function PersonEditPage() {
         .select('id')
         .single();
       if (insertError || !data) {
-        setError(insertError?.message ?? 'Failed to create record.');
+        setError(insertError?.code === '23505' ? 'Another person already has that phone number or employee ID.' : insertError?.message ?? 'Failed to create record.');
         setSaving(false);
         return;
       }
@@ -106,10 +115,11 @@ export default function PersonEditPage() {
     } else {
       const { error: updateError } = await supabase.from('people').update(payload).eq('id', id);
       if (updateError) {
-        setError(updateError.message);
+        setError(updateError.code === '23505' ? 'Another person already has that phone number or employee ID.' : updateError.message);
         setSaving(false);
         return;
       }
+      setForm((f) => ({ ...f, mobile_phone: phone }));
     }
     setSaving(false);
   };
@@ -159,11 +169,12 @@ export default function PersonEditPage() {
             <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
             Active (uncheck to mark inactive)
           </label>
-          <button className="btn-primary" onClick={save} disabled={saving}>
+          <button className="btn-primary" onClick={save} disabled={saving || !canEdit}>
             {saving ? 'Saving…' : isNew ? 'Create' : 'Save changes'}
           </button>
         </div>
       </div>
+      {!isNew && id && <PersonRelations personId={id} canEdit={canEdit} />}
     </div>
   );
 }

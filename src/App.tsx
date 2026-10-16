@@ -9,6 +9,9 @@ import InboxPage from './pages/InboxPage';
 import InboxHistoryPage from './pages/InboxHistoryPage';
 import PeoplePage from './pages/PeoplePage';
 import PersonEditPage from './pages/PersonEditPage';
+import ImportPage from './pages/ImportPage';
+import GroupsPage from './pages/GroupsPage';
+import GroupDetailPage from './pages/GroupDetailPage';
 import OrgSettingsPage from './pages/OrgSettingsPage';
 import UserAdminPage from './pages/UserAdminPage';
 
@@ -56,7 +59,10 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="history" element={<InboxHistoryPage />} />
         <Route path="people" element={<PeoplePage />} />
+        <Route path="people/import" element={<ImportPage />} />
         <Route path="people/:id" element={<PersonEditPage />} />
+        <Route path="groups" element={<GroupsPage />} />
+        <Route path="groups/:id" element={<GroupDetailPage />} />
         <Route path="settings" element={<OrgSettingsPage />} />
         <Route path="admin/users" element={<UserAdminPage />} />
       </Route>

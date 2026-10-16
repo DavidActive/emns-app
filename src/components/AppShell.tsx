@@ -54,6 +54,7 @@ export default function AppShell() {
           <NavLink to="/inbox" style={navItemStyle}>Inbox</NavLink>
           <NavLink to="/history" style={navItemStyle}>Inbox History</NavLink>
           <NavLink to="/people" style={navItemStyle}>People</NavLink>
+          <NavLink to="/groups" style={navItemStyle}>Groups</NavLink>
           <NavLink to="/settings" style={navItemStyle}>Org Settings</NavLink>
           {staff?.is_platform_admin && (
             <NavLink to="/admin/users" style={navItemStyle}>Platform Admin</NavLink>
