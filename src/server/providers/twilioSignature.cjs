@@ -29,7 +29,19 @@ function checkTwilioSignature(event, params, functionName, env = process.env) {
   } catch (e) {
     console.error(`${functionName}: signature validation threw`, e);
   }
-  if (!valid) console.warn(`${functionName}: Twilio signature NOT valid for ${url} (enforce=${enforce})`);
+  if (!valid) {
+    // Diagnostics only: never logs the token or signature. Shows whether the token exists and which URL form (if any) would have matched.
+    const h = event.headers || {};
+    const tok = env.TWILIO_AUTH_TOKEN || '';
+    const candidates = {
+      computed: url,
+      host_header: `https://${h.host}/.netlify/functions/${functionName}`,
+      forwarded_host: `https://${h['x-forwarded-host']}/.netlify/functions/${functionName}`,
+      no_functions_prefix: `https://${h.host}/${functionName}`,
+    };
+    const matches = Object.entries(candidates).filter(([, u]) => { try { return validateTwilioRequest(tok, signature, u, params); } catch { return false; } }).map(([k]) => k);
+    console.warn(`${functionName}: Twilio signature NOT valid for ${url} (enforce=${enforce}) tokenPresent=${Boolean(tok)} tokenLength=${tok.length} tokenHasWhitespaceOrQuote=${/^[\s"']|[\s"']$/.test(tok)} baseUrlOverride=${Boolean(env.TWILIO_WEBHOOK_BASE_URL)} sigHeaderPresent=${Boolean(signature)} paramCount=${Object.keys(params || {}).length} matchingUrlForms=${JSON.stringify(matches)}`);
+  }
   return { valid, enforce, reject: enforce && !valid };
 }
 
