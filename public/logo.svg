@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="eMNS emblem">
+<defs>
+<radialGradient id="bg" cx="50%" cy="42%" r="65%"><stop offset="0" stop-color="#27508f"/><stop offset="1" stop-color="#0d2247"/></radialGradient>
+<radialGradient id="glow" cx="50%" cy="75%" r="55%"><stop offset="0" stop-color="#ffd97a" stop-opacity=".6"/><stop offset=".55" stop-color="#f0b840" stop-opacity=".14"/><stop offset="1" stop-color="#f0b840" stop-opacity="0"/></radialGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset=".5" stop-color="#e2a82f"/><stop offset="1" stop-color="#b57b12"/></linearGradient>
+<clipPath id="disc"><circle cx="128" cy="128" r="110"/></clipPath>
+</defs>
+<circle cx="128" cy="128" r="122" fill="url(#gold)"/>
+<circle cx="128" cy="128" r="116" fill="#0d2247"/>
+<circle cx="128" cy="128" r="110" fill="url(#bg)"/>
+<circle cx="128" cy="128" r="104" fill="none" stroke="#e2a82f" stroke-opacity=".55" stroke-width="1.2"/>
+<g clip-path="url(#disc)">
+<circle cx="128" cy="190" r="110" fill="url(#glow)"/>
+<path d="M34,208 A94,94 0 0 1 222,208" fill="none" stroke="#f3c04f" stroke-width="2.4"/>
+<path d="M62.2,208 A65.8,65.8 0 0 1 193.8,208" fill="none" stroke="#f3c04f" stroke-opacity=".7" stroke-width="1.3"/>
+<path d="M90.4,208 A37.6,37.6 0 0 1 165.6,208" fill="none" stroke="#f3c04f" stroke-opacity=".7" stroke-width="1.3"/>
+<path d="M90.4,208 A37.6,94 0 0 1 165.6,208" fill="none" stroke="#f3c04f" stroke-opacity=".7" stroke-width="1.2"/>
+<path d="M57.5,208 A70.5,94 0 0 1 198.5,208" fill="none" stroke="#f3c04f" stroke-opacity=".7" stroke-width="1.2"/>
+<line x1="128" y1="208" x2="128" y2="114" fill="none" stroke="#f3c04f" stroke-opacity=".6" stroke-width="1.2"/>
+<circle cx="128.0" cy="114.0" r="2.8" fill="#ffe9a8"/>
+<circle cx="181.9" cy="170.3" r="2.8" fill="#ffe9a8"/>
+<circle cx="155.8" cy="148.4" r="2.8" fill="#ffe9a8"/>
+<circle cx="100.2" cy="148.4" r="2.8" fill="#ffe9a8"/>
+<circle cx="74.1" cy="170.3" r="2.8" fill="#ffe9a8"/>
+<circle cx="158.8" cy="186.4" r="2.8" fill="#ffe9a8"/>
+<circle cx="143.9" cy="173.9" r="2.8" fill="#ffe9a8"/>
+<circle cx="112.1" cy="173.9" r="2.8" fill="#ffe9a8"/>
+<circle cx="97.2" cy="186.4" r="2.8" fill="#ffe9a8"/>
+<circle cx="218.8" cy="183.7" r="2.8" fill="#ffe9a8"/>
+<circle cx="200.0" cy="147.6" r="2.8" fill="#ffe9a8"/>
+<circle cx="56.0" cy="147.6" r="2.8" fill="#ffe9a8"/>
+<circle cx="37.2" cy="183.7" r="2.8" fill="#ffe9a8"/>
+<g fill="#fff"><circle cx="110" cy="143" r="10"/><path d="M92,158 Q92,152 99,152 L121,152 Q128,152 128,158 L128,186 L121,186 L121,208 L112,208 L112,188 L108,188 L108,208 L99,208 L99,186 L92,186 Z"/></g>
+<g fill="#fff"><circle cx="146" cy="143" r="10"/><path d="M128,158 Q128,152 135,152 L157,152 Q164,152 164,158 L164,186 L157,186 L157,208 L148,208 L148,188 L144,188 L144,208 L135,208 L135,186 L128,186 Z"/></g>
+<ellipse cx="128" cy="208" rx="70" ry="4" fill="#e2a82f" fill-opacity=".5"/>
+</g>
+<circle cx="40.1" cy="87.0" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="57.1" cy="61.8" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="81.0" cy="43.2" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="109.5" cy="32.8" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="139.8" cy="31.7" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="169.0" cy="40.1" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="194.2" cy="57.1" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+<circle cx="212.8" cy="81.0" r="1.7" fill="#f3c04f" fill-opacity=".85"/>
+</svg>

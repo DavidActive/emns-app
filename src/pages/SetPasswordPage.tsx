@@ -61,7 +61,9 @@ export default function SetPasswordPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--brand-navy)' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: 340, textAlign: 'center' }}>
+        <img src="/logo.svg" alt="" width={72} height={72} style={{ display: 'block', margin: '0 auto 6px' }} />
         <strong style={{ fontSize: 20 }}>eMNS</strong>
+        <div style={{ fontSize: 13, color: 'var(--brand-gray-600)' }}>Emergency Mass Notification</div>
         <h1 style={{ fontSize: 20, margin: '12px 0 4px' }}>Set your password</h1>
         <input
           type="password"

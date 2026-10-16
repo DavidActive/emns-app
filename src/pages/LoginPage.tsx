@@ -53,7 +53,9 @@ export default function LoginPage() {
         className="card"
         style={{ width: 440, textAlign: 'center' }}
       >
-                <h1 style={{ fontSize: 20, margin: '12px 0 4px' }}>eMNS</h1>
+        <img src="/logo.svg" alt="" width={88} height={88} style={{ display: 'block', margin: '0 auto 8px' }} />
+        <h1 style={{ fontSize: 24, margin: '4px 0 0' }}>eMNS</h1>
+        <div style={{ fontSize: 14, color: 'var(--brand-gray-600)', margin: '2px 0 4px' }}>Emergency Mass Notification</div>
         <p style={{ color: 'var(--brand-gray-600)', fontSize: 13, marginBottom: 20 }}>
           {mode === 'signIn' ? 'Staff & peer-support sign in' : 'Reset your password'}
         </p>

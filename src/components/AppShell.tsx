@@ -32,7 +32,11 @@ export default function AppShell() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <aside style={{ width: 320, background: 'var(--brand-navy)', padding: 20, color: 'white' }}>
-        <div style={{ textAlign: 'center', fontSize: 28, fontWeight: 800, margin: '0 0 20px' }}>eMNS</div>
+        <div style={{ textAlign: 'center', margin: '0 0 20px' }}>
+          <img src="/logo.svg" alt="" width={96} height={96} style={{ display: 'block', margin: '0 auto 8px' }} />
+          <div style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1 }}>eMNS</div>
+          <div style={{ fontSize: 13, color: 'var(--brand-teal-light)', marginTop: 4 }}>Emergency Mass Notification</div>
+        </div>
         {twilioNumber && (
           <div
             style={{
