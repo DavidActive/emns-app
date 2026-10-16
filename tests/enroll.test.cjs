@@ -31,7 +31,7 @@ test('consent text names the organization and has every required disclosure', ()
     assert.ok(t.includes(must), must);
   }
   assert.equal(confirmationMessage('Acme Hospital'),
-    'Active SOS eMNS: You are enrolled to receive alerts from Acme Hospital. Message frequency varies. Msg&Data rates may apply. Reply HELP for help, STOP to opt out.');
+    'Active SOS eMNS: You are enrolled to receive alerts from Acme Hospital. Message frequency varies. Msg&Data rates may apply. Reply HELP for help, STOP to opt out. Terms: https://www.activesos.com/emns-sms-terms Privacy: https://www.activesos.com/emns-privacy-policy');
 });
 
 test('GET: malformed links never reach the database; a valid link shows the organization and consent text, never the phone number', async () => {
