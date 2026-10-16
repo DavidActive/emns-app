@@ -2,8 +2,10 @@
  * MessageProvider contract (documented as JSDoc; implementations are plain CommonJS).
  *
  * @typedef {Object} SendRequest
- * @property {'sms'} channel            Only 'sms' in P1. 'voice' and 'email' arrive in later prompts.
- * @property {string} to                E.164 destination (resolved server-side by the caller).
+ * @property {'sms'|'email'} channel   'sms' (Twilio) or 'email' (Resend). 'voice' arrives in a later prompt.
+ * @property {string} to                E.164 number for sms, address for email (resolved server-side by the caller).
+ * @property {string} [subject]          Email only.
+ * @property {string} [idempotencyKey]   Email only: the provider drops a repeat of the same key.
  * @property {string} body
  * @property {string} [from]            Sender number (ignored when messagingServiceSid is given).
  * @property {string} [messagingServiceSid]

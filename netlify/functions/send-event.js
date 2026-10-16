@@ -7,7 +7,10 @@
 // and have not opted out are queued. Groups must belong to the caller's organization.
 // ROLES (P6): viewers cannot send. Operators may send drills and tests only. Real alerts need sender or admin (or platform admin).
 //
-// Request:  POST { kind: 'alert'|'drill'|'test', body?, group_ids?: [uuid], scenario_id?: uuid, requires_ack?: boolean, idempotency_key?: string }
+// Request:  POST { kind: 'alert'|'drill'|'test', body?, group_ids?: [uuid], scenario_id?: uuid, requires_ack?: boolean, idempotency_key?: string,
+//                  channels?: ['sms'|'email', ...] (default ['sms']; order matters in fallback mode),
+//                  mode?: 'together'|'fallback' (default 'together'; fallback sends the first usable channel and the next one only if it fails),
+//                  email_subject?: string }
 //           + Authorization: Bearer <supabase session token>
 //           body and group_ids may come from the scenario. body is required for alerts and optional for drills and tests.
 // The text recipients get is built here (brand, organization name, DRILL/TEST tag, opt-out wording), never taken verbatim.
@@ -16,6 +19,7 @@
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
 const { formatMessage } = require('../../src/server/broadcast/messageFormat.cjs');
+const { formatEmail } = require('../../src/server/broadcast/emailFormat.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
 const ALERT_ROLES = ['admin', 'sender'];
@@ -24,6 +28,8 @@ const MAX_BODY = 1600;
 const MAX_GROUPS = 50;
 const KINDS = ['alert', 'drill', 'test'];
 const UUID_RE = /^[0-9a-f-]{36}$/i;
+const CHANNELS = ['sms', 'email'];
+const MODES = ['together', 'fallback'];
 
 async function kickWorker(event, env = process.env, fetchImpl = globalThis.fetch) {
   const secret = env.EMNS_WORKER_SECRET;
@@ -70,6 +76,16 @@ exports.handler = async (event) => {
   const groupIds = ownGroups.length ? ownGroups : [...new Set((scenario && scenario.default_group_ids) || [])];
   const requiresAck = payload.requires_ack !== undefined ? payload.requires_ack !== false : !(scenario && scenario.requires_ack === false);
 
+  // Channels: validated here, and again inside the database function.
+  const channels = payload.channels === undefined ? ['sms'] : payload.channels;
+  if (!Array.isArray(channels) || channels.length === 0 || !channels.every((c) => CHANNELS.includes(c)) || new Set(channels).size !== channels.length) {
+    return json(400, { error: 'channels must be a list of sms and/or email, each at most once.' });
+  }
+  const mode = payload.mode === undefined ? 'together' : payload.mode;
+  if (!MODES.includes(mode)) return json(400, { error: 'mode must be together or fallback.' });
+  const scenarioEmail = scenario && scenario.bodies && scenario.bodies.email && typeof scenario.bodies.email === 'object' ? scenario.bodies.email : {};
+  const emailSubjectGiven = typeof payload.email_subject === 'string' && payload.email_subject.trim() ? payload.email_subject : (typeof scenarioEmail.subject === 'string' ? scenarioEmail.subject : '');
+
   if (kind === 'alert' && !rawBody) return json(400, { error: 'Message cannot be empty.' });
   if (groupIds.length === 0) return json(400, { error: 'Select at least one group.' });
   if (groupIds.length > MAX_GROUPS) return json(400, { error: `Select at most ${MAX_GROUPS} groups.` });
@@ -81,6 +97,13 @@ exports.handler = async (event) => {
   const body = formatMessage({ kind, orgName: org && org.name, body: rawBody, requiresAck, drillTag: settings.drill_tag, testTag: settings.test_tag });
   if (body.length > MAX_BODY) return json(400, { error: `Message is too long (max ${MAX_BODY} characters including the standard wording).` });
 
+  // The email subject and text are built here too (brand, organization, DRILL/TEST tag, footer), never taken verbatim.
+  let email = null;
+  if (channels.includes('email')) {
+    const emailBodyRaw = ownBody || (typeof scenarioEmail.body === 'string' ? scenarioEmail.body.trim() : '') || rawBody;
+    email = formatEmail({ kind, orgName: org && org.name, subject: emailSubjectGiven, body: emailBodyRaw, requiresAck, drillTag: settings.drill_tag, testTag: settings.test_tag });
+  }
+
   const { data, error } = await supabase.rpc('create_notification_event', {
     p_org: caller.organization_id,
     p_kind: kind,
@@ -90,10 +113,14 @@ exports.handler = async (event) => {
     p_requires_ack: requiresAck,
     p_scenario: scenario ? scenario.id : null,
     p_idempotency_key: typeof payload.idempotency_key === 'string' && payload.idempotency_key ? payload.idempotency_key.slice(0, 100) : null,
+    p_channels: channels,
+    p_mode: mode,
+    p_email_subject: email ? email.subject : null,
+    p_email_body: email ? email.text : null,
   });
   if (error) {
     const msg = error.message || 'Could not create the notification.';
-    return json(/group|body|kind/i.test(msg) ? 400 : 500, { error: msg });
+    return json(/group|body|kind|channel|mode|subject/i.test(msg) ? 400 : 500, { error: msg });
   }
 
   if (!data.deduplicated && data.queued > 0) await kickWorker(event);

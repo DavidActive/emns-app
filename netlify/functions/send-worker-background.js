@@ -7,7 +7,7 @@
 
 const crypto = require('crypto');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
-const { getMessageProvider } = require('../../src/server/providers/index.cjs');
+const { getMessageProvider, getEmailProvider } = require('../../src/server/providers/index.cjs');
 const { runWorker } = require('../../src/server/broadcast/worker.cjs');
 const { baseUrl } = require('../../src/server/providers/twilioSignature.cjs');
 
@@ -26,10 +26,15 @@ exports.handler = async (event) => {
   if (!secretOk(event, env)) return { statusCode: 401, body: 'Unauthorized' };
 
   const provider = getMessageProvider(env);
+  let emailProvider = null;
+  try { emailProvider = getEmailProvider(env); }
+  catch (e) { console.error('send-worker: email provider unavailable; email deliveries will fail over to the next channel', e.message); }
   const isMock = provider.name === 'mock';
   const stats = await runWorker({
     db: getDb(),
     provider,
+    emailProvider,
+    emailRatePerSec: Number(env.EMNS_EMAIL_RATE_PER_SEC) || (emailProvider && emailProvider.name === 'mock' ? 0 : 2), // Resend allows 2 requests per second by default
     workerId: `bg-${crypto.randomUUID()}`,
     batchSize: Number(env.EMNS_SEND_BATCH) || 50,
     concurrency: Number(env.EMNS_SEND_CONCURRENCY) || 10,

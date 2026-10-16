@@ -1,12 +1,18 @@
 // Provider factory. Defaults are SAFE: mock provider, no real sends.
 const { createMockMessageProvider } = require('./mockMessageProvider.cjs');
 const { createTwilioMessageProvider } = require('./twilioMessageProvider.cjs');
+const { createMockEmailProvider } = require('./mockEmailProvider.cjs');
+const { createResendEmailProvider } = require('./resendEmailProvider.cjs');
 const { ProviderError } = require('./types.cjs');
 
 let messageOverride = null;           // tests can inject a provider
 let cached = null;
+let emailOverride = null;
+let emailCached = null;
 
 function setMessageProviderForTests(p) { messageOverride = p; cached = null; }
+
+function setEmailProviderForTests(p) { emailOverride = p; emailCached = null; }
 
 function getMessageProvider(env = process.env) {
   if (messageOverride) return messageOverride;
@@ -27,4 +33,24 @@ function getMessageProvider(env = process.env) {
   return provider;
 }
 
-module.exports = { getMessageProvider, setMessageProviderForTests };
+// Email provider. Same safe default: mock, no real sends. The real provider needs EMNS_EMAIL_PROVIDER=resend AND EMNS_ALLOW_REAL_SEND=true.
+function getEmailProvider(env = process.env) {
+  if (emailOverride) return emailOverride;
+  if (emailCached && emailCached.env === env) return emailCached.provider;
+  const choice = (env.EMNS_EMAIL_PROVIDER || 'mock').toLowerCase();
+  let provider;
+  if (choice === 'resend') {
+    if (env.EMNS_ALLOW_REAL_SEND !== 'true') {
+      throw new ProviderError('Real sends are disabled. Set EMNS_ALLOW_REAL_SEND=true to use the Resend provider.', 'real_send_disabled');
+    }
+    provider = createResendEmailProvider(env);
+  } else if (choice === 'mock') {
+    provider = createMockEmailProvider();
+  } else {
+    throw new ProviderError(`Unknown EMNS_EMAIL_PROVIDER "${choice}".`, 'bad_config');
+  }
+  emailCached = { env, provider };
+  return provider;
+}
+
+module.exports = { getMessageProvider, setMessageProviderForTests, getEmailProvider, setEmailProviderForTests };
