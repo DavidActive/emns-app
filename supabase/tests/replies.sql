@@ -11,7 +11,7 @@ begin
   insert into operators (user_id,organization_id,full_name,role) values (u,o,'A admin','admin'),(u2,o2,'B admin','admin');
   insert into groups (organization_id,name) values (o,'All') returning id into g;
   insert into people (organization_id,full_name,mobile_phone,consent_status)
-    select o, 'P'||lpad(i::text,3,'0'), '+1555'||lpad(i::text,7,'0'), 'consented' from generate_series(1,100) i;
+    select o, 'P'||lpad(gs.n::text,3,'0'), '+1555'||lpad(gs.n::text,7,'0'), 'consented' from generate_series(1,100) as gs(n);
   insert into people (organization_id,full_name,mobile_phone) values (o,'NoConsent','+15550009001');
   insert into group_members (group_id,person_id) select g, id from people where organization_id = o;
 
