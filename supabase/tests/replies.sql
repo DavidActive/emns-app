@@ -92,5 +92,5 @@ begin
   out := array_append(out, '16 own organization can read it: '||case when public.event_roll_call(ev3) is not null then 'yes (ok)' else 'no (FAIL)' end);
   reset role;
 
-  raise exception E'REPLIES / ROLL-CALL TEST (rolled back)\n%', array_to_string(out, E'\n');
+  raise exception '%', 'REPLIES / ROLL-CALL TEST (rolled back)' || chr(10) || array_to_string(out, chr(10));
 end $$;
