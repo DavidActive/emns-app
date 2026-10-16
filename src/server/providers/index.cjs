@@ -3,16 +3,22 @@ const { createMockMessageProvider } = require('./mockMessageProvider.cjs');
 const { createTwilioMessageProvider } = require('./twilioMessageProvider.cjs');
 const { createMockEmailProvider } = require('./mockEmailProvider.cjs');
 const { createResendEmailProvider } = require('./resendEmailProvider.cjs');
+const { createMockVoiceProvider } = require('./mockVoiceProvider.cjs');
+const { createTwilioVoiceProvider } = require('./twilioVoiceProvider.cjs');
 const { ProviderError } = require('./types.cjs');
 
 let messageOverride = null;           // tests can inject a provider
 let cached = null;
 let emailOverride = null;
 let emailCached = null;
+let voiceOverride = null;
+let voiceCached = null;
 
 function setMessageProviderForTests(p) { messageOverride = p; cached = null; }
 
 function setEmailProviderForTests(p) { emailOverride = p; emailCached = null; }
+
+function setVoiceProviderForTests(p) { voiceOverride = p; voiceCached = null; }
 
 function getMessageProvider(env = process.env) {
   if (messageOverride) return messageOverride;
@@ -53,4 +59,24 @@ function getEmailProvider(env = process.env) {
   return provider;
 }
 
-module.exports = { getMessageProvider, setMessageProviderForTests, getEmailProvider, setEmailProviderForTests };
+// Voice provider. Same safe default: mock, no real calls. The real provider needs EMNS_VOICE_PROVIDER=twilio AND EMNS_ALLOW_REAL_SEND=true.
+function getVoiceProvider(env = process.env) {
+  if (voiceOverride) return voiceOverride;
+  if (voiceCached && voiceCached.env === env) return voiceCached.provider;
+  const choice = (env.EMNS_VOICE_PROVIDER || 'mock').toLowerCase();
+  let provider;
+  if (choice === 'twilio') {
+    if (env.EMNS_ALLOW_REAL_SEND !== 'true') {
+      throw new ProviderError('Real sends are disabled. Set EMNS_ALLOW_REAL_SEND=true to place real calls.', 'real_send_disabled');
+    }
+    provider = createTwilioVoiceProvider(env);
+  } else if (choice === 'mock') {
+    provider = createMockVoiceProvider();
+  } else {
+    throw new ProviderError(`Unknown EMNS_VOICE_PROVIDER "${choice}".`, 'bad_config');
+  }
+  voiceCached = { env, provider };
+  return provider;
+}
+
+module.exports = { getMessageProvider, setMessageProviderForTests, getEmailProvider, setEmailProviderForTests, getVoiceProvider, setVoiceProviderForTests };

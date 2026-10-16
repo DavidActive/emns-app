@@ -7,7 +7,7 @@
 
 const crypto = require('crypto');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
-const { getMessageProvider, getEmailProvider } = require('../../src/server/providers/index.cjs');
+const { getMessageProvider, getEmailProvider, getVoiceProvider } = require('../../src/server/providers/index.cjs');
 const { runWorker } = require('../../src/server/broadcast/worker.cjs');
 const { baseUrl } = require('../../src/server/providers/twilioSignature.cjs');
 
@@ -29,11 +29,18 @@ exports.handler = async (event) => {
   let emailProvider = null;
   try { emailProvider = getEmailProvider(env); }
   catch (e) { console.error('send-worker: email provider unavailable; email deliveries will fail over to the next channel', e.message); }
+  let voiceProvider = null;
+  try { voiceProvider = getVoiceProvider(env); }
+  catch (e) { console.error('send-worker: voice provider unavailable; voice deliveries will fail over to the next channel', e.message); }
   const isMock = provider.name === 'mock';
   const stats = await runWorker({
     db: getDb(),
     provider,
     emailProvider,
+    voiceProvider,
+    voiceRatePerSec: Number(env.EMNS_VOICE_RATE_PER_SEC) || (voiceProvider && voiceProvider.name === 'mock' ? 0 : 1), // calls start slowly: each one holds a phone line
+    voiceMaxActive: Number(env.EMNS_VOICE_MAX_ACTIVE) || (voiceProvider && voiceProvider.name === 'mock' ? 0 : 10), // concurrency limit for simultaneous calls
+    voiceBaseUrl: `${baseUrl(event, env)}/.netlify/functions`,
     emailRatePerSec: Number(env.EMNS_EMAIL_RATE_PER_SEC) || (emailProvider && emailProvider.name === 'mock' ? 0 : 2), // Resend allows 2 requests per second by default
     workerId: `bg-${crypto.randomUUID()}`,
     batchSize: Number(env.EMNS_SEND_BATCH) || 50,

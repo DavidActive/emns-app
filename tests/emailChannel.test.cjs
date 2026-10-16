@@ -220,7 +220,7 @@ test('send-event builds the email subject and text itself and passes channel ord
 
 test('send-event rejects bad channels and modes before touching the database', async () => {
   const fn = loadFunction('send-event');
-  for (const extra of [{ channels: [] }, { channels: ['voice'] }, { channels: ['sms', 'sms'] }, { channels: 'sms' }, { mode: 'sideways' }]) {
+  for (const extra of [{ channels: [] }, { channels: ['carrier-pigeon'] }, { channels: ['sms', 'sms'] }, { channels: 'sms' }, { mode: 'sideways' }]) {
     const db = setup();
     const r = await fn.handler(post({ kind: 'drill', group_ids: [G1], ...extra }));
     assert.strictEqual(r.statusCode, 400, JSON.stringify(extra));

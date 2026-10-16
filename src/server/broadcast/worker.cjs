@@ -10,7 +10,9 @@
 // Provider error codes that will never succeed on retry (bad number, opted out, not a mobile, etc.).
 const PERMANENT_CODES = new Set(['21211', '21214', '21217', '21408', '21610', '21612', '21614', '21617', '30003', '30005', '30006', '30007',
   // email: a bad address, bad credentials or a rejected message will not succeed on retry; failing fast lets the next channel take over
-  'invalid_email', 'email_auth', 'email_rejected', 'email_not_configured']);
+  'invalid_email', 'email_auth', 'email_rejected', 'email_not_configured',
+  // voice: bad or unreachable number, no permission to call that region, caller number problems, no voice provider
+  '21215', '21216', '21219', '13224', '13225', 'voice_not_configured']);
 const OPT_OUT_CODE = '21610';
 
 const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -27,6 +29,10 @@ function classify(err) {
  * @param {object} o.provider     MessageProvider for text
  * @param {object} [o.emailProvider] MessageProvider for email (email rows fail permanently when absent, so the next channel takes over)
  * @param {number} [o.emailRatePerSec=0] max email sends started per second (0 = unlimited)
+ * @param {object} [o.voiceProvider] places calls (voice rows fail permanently when absent, so the next channel takes over)
+ * @param {number} [o.voiceRatePerSec=0] max calls started per second (0 = unlimited)
+ * @param {number} [o.voiceMaxActive=0] max calls in flight at once, enforced by the queue (0 = no cap)
+ * @param {string} [o.voiceBaseUrl] functions base URL, e.g. https://site/.netlify/functions (used to build the call's TwiML and status URLs)
  * @param {string} o.workerId     unique per invocation
  * @param {number} [o.batchSize=50]
  * @param {number} [o.concurrency=10]       parallel sends inside a batch
@@ -41,10 +47,10 @@ function classify(err) {
  */
 async function runWorker(o) {
   const {
-    db, provider, emailProvider, emailRatePerSec = 0, workerId, batchSize = 50, concurrency = 10, ratePerSec = 0, leaseSeconds = 120,
+    db, provider, emailProvider, emailRatePerSec = 0, voiceProvider, voiceRatePerSec = 0, voiceMaxActive = 0, voiceBaseUrl = '', workerId, batchSize = 50, concurrency = 10, ratePerSec = 0, leaseSeconds = 120,
     maxRuntimeMs = 0, messagingServiceSid, statusCallback, now = Date.now, sleep = defaultSleep, shouldCrash = () => false,
   } = o;
-  const stats = { claimed: 0, sent: 0, failed: 0, retried: 0, emailSent: 0, emailFailed: 0, optedOut: 0, batches: 0, timedOut: false, crashed: false };
+  const stats = { claimed: 0, sent: 0, failed: 0, retried: 0, emailSent: 0, emailFailed: 0, voiceSent: 0, voiceFailed: 0, optedOut: 0, batches: 0, timedOut: false, crashed: false };
   const started = now();
   // One rate limiter per channel: earliest time the next send may start.
   function makeLimiter(perSec) {
@@ -60,11 +66,13 @@ async function runWorker(o) {
   }
   const takeSmsSlot = makeLimiter(ratePerSec);
   const takeEmailSlot = makeLimiter(emailRatePerSec);
+  const takeVoiceSlot = makeLimiter(voiceRatePerSec);
 
   async function sendOne(row) {
     if (shouldCrash()) { stats.crashed = true; return; }
     const isEmail = row.channel === 'email';
-    await (isEmail ? takeEmailSlot() : takeSmsSlot());
+    const isVoice = row.channel === 'voice';
+    await (isEmail ? takeEmailSlot() : isVoice ? takeVoiceSlot() : takeSmsSlot());
     if (shouldCrash()) { stats.crashed = true; return; }
     let result;
     try {
@@ -72,6 +80,13 @@ async function runWorker(o) {
       if (isEmail) {
         if (!emailProvider) { const e = new Error('No email provider is configured.'); e.code = 'email_not_configured'; throw e; }
         res = await emailProvider.send({ channel: 'email', to: row.to_email, subject: row.subject, body: row.body, idempotencyKey: `emns-${row.delivery_id}` });
+      } else if (isVoice) {
+        if (!voiceProvider) { const e = new Error('No voice provider is configured.'); e.code = 'voice_not_configured'; throw e; }
+        res = await voiceProvider.send({
+          channel: 'voice', to: row.to_number,
+          twimlUrl: `${voiceBaseUrl}/voice-twiml/${row.delivery_id}`,
+          statusCallback: `${voiceBaseUrl}/voice-status`,
+        });
       } else {
         res = await provider.send({ channel: 'sms', to: row.to_number, body: row.body, messagingServiceSid, statusCallback });
       }
@@ -79,7 +94,7 @@ async function runWorker(o) {
     } catch (err) {
       const c = classify(err);
       result = { p_outcome: c.outcome, p_error_code: c.code || null, p_error_message: String(err && err.message || err).slice(0, 500) };
-      if (c.optOut && !isEmail) {
+      if (c.optOut && !isEmail && !isVoice) {
         stats.optedOut++;
         await db.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date(now()).toISOString(), consent_status: 'withdrawn' }).eq('id', row.person_id);
       }
@@ -88,15 +103,15 @@ async function runWorker(o) {
     const { data, error } = await db.rpc('record_delivery_result', { p_delivery: row.delivery_id, p_worker: workerId, ...result });
     if (error) throw new Error(`record_delivery_result failed: ${error.message}`);
     if (data === false) return; // another worker owns this row now; theirs is the record
-    if (result.p_outcome === 'sent') { stats.sent++; if (isEmail) stats.emailSent++; }
-    else if (result.p_outcome === 'failed') { stats.failed++; if (isEmail) stats.emailFailed++; }
+    if (result.p_outcome === 'sent') { stats.sent++; if (isEmail) stats.emailSent++; if (isVoice) stats.voiceSent++; }
+    else if (result.p_outcome === 'failed') { stats.failed++; if (isEmail) stats.emailFailed++; if (isVoice) stats.voiceFailed++; }
     else stats.retried++;
   }
 
   for (;;) {
     if (stats.crashed) break;
     if (maxRuntimeMs && now() - started >= maxRuntimeMs) { stats.timedOut = true; break; }
-    const { data: rows, error } = await db.rpc('claim_deliveries', { p_worker: workerId, p_limit: batchSize, p_lease_seconds: leaseSeconds });
+    const { data: rows, error } = await db.rpc('claim_deliveries', { p_worker: workerId, p_limit: batchSize, p_lease_seconds: leaseSeconds, p_voice_max_active: voiceMaxActive });
     if (error) throw new Error(`claim_deliveries failed: ${error.message}`);
     if (!rows || rows.length === 0) break;
     stats.batches++;
