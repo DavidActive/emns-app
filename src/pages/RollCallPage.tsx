@@ -48,7 +48,7 @@ export default function RollCallPage() {
 
   return (
     <div style={{ maxWidth: 1000 }}>
-      <Link to="/events">← Sent events</Link>
+      <Link to="/events">← Sent events</Link> · <Link to={`/events/${id}/report`}>After-action report</Link>
       <h1 style={{ marginBottom: 4 }}>Roll-call <span style={{ textTransform: 'uppercase', fontSize: 16, color: 'var(--brand-gray-600)' }}>{data.event.kind}</span></h1>
       <p style={{ color: 'var(--brand-gray-600)', marginTop: 0 }}>
         Sent {new Date(data.event.created_at).toLocaleString()}{live ? ' · updating live' : ''}{updated ? ` · checked ${updated.toLocaleTimeString()}` : ''}

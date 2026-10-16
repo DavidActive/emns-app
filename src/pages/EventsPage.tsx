@@ -46,7 +46,7 @@ export default function EventsPage() {
                 <td style={{ padding: 6 }}>{e.delivered}</td>
                 <td style={{ padding: 6 }}>{e.undelivered + e.failed}</td>
                 <td style={{ padding: 6 }}>{e.skipped}</td>
-                <td style={{ padding: 6 }}><Link to={`/events/${e.id}`}>Open</Link></td>
+                <td style={{ padding: 6 }}><Link to={`/events/${e.id}`}>Open</Link> · <Link to={`/events/${e.id}/report`}>Report</Link></td>
               </tr>
             ))}
           </tbody>
