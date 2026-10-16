@@ -65,7 +65,7 @@ begin
   select count(*) into n from audit_log where organization_id = oa and action = 'roster_import';
   out := array_append(out, '17 audit rows (expect 2): '||n||case when n=2 then ' (ok)' else ' (FAIL)' end);
   select count(*) into n from people where organization_id = ob;
-  out := array_append(out, '18 org B untouched (expect 1): '||n||case when n=1 then ' (ok)' else ' (FAIL)' end);
+  out := array_append(out, '18 org B rows invisible to org A admin (expect 0): '||n||case when n=0 then ' (ok)' else ' (FAIL)' end);
   begin
     update audit_log set action = 'tamper' where organization_id = oa;
     get diagnostics n = row_count;
