@@ -20,6 +20,13 @@ exports.handler = async (event) => {
   const status = params.MessageStatus || params.SmsStatus;
   if (!sid || !status) return ok;
 
+  // Broadcast deliveries first: status only ever moves forward (sent -> delivered), enforced in the database.
+  const { data: applied } = await supabase.rpc('apply_delivery_status', { p_sid: sid, p_status: status, p_error_code: params.ErrorCode || null });
+  if (applied === true && params.ErrorCode === '21610') {
+    const { data: d } = await supabase.from('notification_deliveries').select('person_id').eq('provider_sid', sid).maybeSingle();
+    if (d?.person_id) await supabase.from('people').update({ sms_opted_out: true, sms_opted_out_at: new Date().toISOString() }).eq('id', d.person_id);
+  }
+
   const { data: msg } = await supabase
     .from('inbox_messages')
     .update({ delivery_status: status, error_code: params.ErrorCode || null })

@@ -1,5 +1,5 @@
--- P5 DRAFT FOR REVIEW. NOT APPLIED. When approved this moves to supabase/migrations/20261016000600_broadcast_engine.sql
--- Broadcast engine: recipient resolution, queue claiming, result recording, delivery status callbacks.
+-- P5 broadcast engine: recipient resolution, queue claiming, result recording, delivery status callbacks.
+-- Applied to the emns project as migration "broadcast_engine". Functions are callable by the service role only.
 -- All functions are callable by the service role only (Netlify functions); browsers never call them.
 
 -- 1. Columns the engine needs

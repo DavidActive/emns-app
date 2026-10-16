@@ -1,7 +1,7 @@
 // Minimal fake of the supabase-js query builder. Every chain method returns the builder;
 // terminal reads (maybeSingle/single/await) resolve from `tables[table]`.
 // Writes are recorded in `calls` so tests can assert on them.
-function createFakeDb({ tables = {}, user = null } = {}) {
+function createFakeDb({ tables = {}, user = null, rpc = {} } = {}) {
   const calls = [];
   function builder(table) {
     const state = { table, op: 'select', payload: null, filters: [] };
@@ -27,6 +27,7 @@ function createFakeDb({ tables = {}, user = null } = {}) {
   return {
     calls,
     from: (t) => builder(t),
+    rpc: async (name, args) => { calls.push({ rpc: name, args }); return rpc[name] ? rpc[name](args) : { data: null, error: null }; },
     auth: { getUser: async () => (user ? { data: { user }, error: null } : { data: { user: null }, error: { message: 'bad token' } }) },
   };
 }
