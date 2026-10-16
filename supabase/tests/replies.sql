@@ -16,7 +16,7 @@ begin
   insert into group_members (group_id,person_id) select g, id from people where organization_id = o;
 
   -- Event 1 asks for acknowledgement; event 2 (newer) does not; event 3 (newest) does.
-  r := public.create_notification_event(o,'drill','Active SOS eMNS: [DRILL] x. Reply SAFE.',array[g],null,true,null,'rc-1');  ev1 := (r->>'event_id')::uuid;
+  r := public.create_notification_event(o,'drill','Active SOS eMNS: [DRILL] x. Reply SAFE.',array[g],null,true,null,'rc-1');  ev1 := (r->>'event_id')::uuid; update notification_events set created_at = now() - interval '3 minutes' where id = ev1;
   out := array_append(out, '1 100 queued, the unconsented person skipped: '||(r->>'queued')||'/'||(r->>'skipped')||case when (r->>'queued')::int=100 and (r->>'skipped')::int=1 then ' (ok)' else ' (FAIL)' end);
   update notification_deliveries set status='sent' where event_id=ev1 and status='queued';
 
@@ -56,12 +56,12 @@ begin
   out := array_append(out, '7 SOS stays SOS after a later SAFE: '||(rc->'counts'->>'sos')||case when (rc->'counts'->>'sos')::int=1 then ' (ok)' else ' (FAIL)' end);
 
   -- Most recent event requiring an acknowledgement wins; an event that does not require one is ignored.
-  r := public.create_notification_event(o,'test','Active SOS eMNS: [TEST] x.',array[g],null,false,null,'rc-2'); ev2 := (r->>'event_id')::uuid;
+  r := public.create_notification_event(o,'test','Active SOS eMNS: [TEST] x.',array[g],null,false,null,'rc-2'); ev2 := (r->>'event_id')::uuid; update notification_events set created_at = now() - interval '2 minutes' where id = ev2;
   update notification_deliveries set status='sent' where event_id=ev2 and status='queued';
   select id into pid from people where organization_id=o and full_name='P090';
   r := public.record_acknowledgement(o, pid, 'SAFE', 'late', 'SM90');
   out := array_append(out, '8 reply skips the newer no-ack event and attaches to the older ack event: '||case when (r->>'event_id')::uuid=ev1 then 'ev1 (ok)' else 'WRONG (FAIL)' end);
-  r := public.create_notification_event(o,'drill','Active SOS eMNS: [DRILL] y.',array[g],null,true,null,'rc-3'); ev3 := (r->>'event_id')::uuid;
+  r := public.create_notification_event(o,'drill','Active SOS eMNS: [DRILL] y.',array[g],null,true,null,'rc-3'); ev3 := (r->>'event_id')::uuid; update notification_events set created_at = now() - interval '1 minutes' where id = ev3;
   update notification_deliveries set status='sent' where event_id=ev3 and status='queued';
   select id into pid from people where organization_id=o and full_name='P091';
   r := public.record_acknowledgement(o, pid, 'SAFE', 'now', 'SM91');
