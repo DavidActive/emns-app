@@ -10,7 +10,7 @@ const SELF = path.basename(__filename);
 let hits = 0;
 (function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP.has(e.name)) continue;
+    if (SKIP.has(e.name) || e.name === '.env.local') continue; // .env.local is git-ignored and holds real dev keys
     const full = path.join(dir, e.name);
     if (e.isDirectory()) { walk(full); continue; }
     if (e.name === SELF || /\.(png|jpg|ico|svg)$/i.test(e.name)) continue;

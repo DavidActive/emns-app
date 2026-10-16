@@ -5,6 +5,8 @@ Outbound emergency mass notification, forked from vetprotect-app. Pilot uses tes
 React 18 + Vite + TypeScript SPA; Supabase Postgres/Auth/RLS; Netlify Functions (esbuild); Twilio.
 Default branch: main.
 
+Supabase project: emns, ref idysicueuqwuogouikdd, us-east-1 (migrations 0001-0004 applied; isolation test in supabase/tests/).
+
 ## Hard rules
 - NEVER use the live VetProtect Supabase project or Twilio number. `npm run check:ids` enforces the known IDs.
 - All vendor access goes through interfaces in src/server/providers/ (DataStore, MessageProvider, later AuthProvider,
