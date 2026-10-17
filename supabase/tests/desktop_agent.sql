@@ -126,7 +126,7 @@ begin
   r := public.agent_claim('not-a-real-token');
   out := out || pg_temp.ck(34, 'an unknown token is refused', not (r->>'ok')::boolean);
 
-  -- 9. What signed-in staff can and cannot do
+  -- 9. What signed-in staff can and cannot do (P1's only computer was removed above, so P1 and P2 now have no computer)
   perform set_config('request.jwt.claim.sub', u::text, true);
   perform set_config('request.jwt.claims', json_build_object('sub',u,'role','authenticated')::text, true);
   set local role authenticated;
@@ -143,7 +143,7 @@ begin
   begin update public.agent_devices set device_name = 'renamed' where id = d3a; out := out || pg_temp.ck(40, 'staff can edit a device', false);
   exception when others then out := out || pg_temp.ck(40, 'staff cannot change anything but "removed"', true); end;
   r := public.preview_desktop_audience(array[g]);
-  out := out || pg_temp.ck(41, 'preview counts: ' || r::text, (r->>'total')::int = 4 and (r->>'will_receive')::int = 3 and (r->>'no_agent')::int = 1 and (r->>'online')::int = 3);
+  out := out || pg_temp.ck(41, 'preview counts: ' || r::text, (r->>'total')::int = 4 and (r->>'will_receive')::int = 2 and (r->>'no_agent')::int = 2 and (r->>'online')::int = 2);
   update public.agent_devices set revoked_at = now() where id = d3b;
   get diagnostics n = row_count;
   out := out || pg_temp.ck(42, 'an admin can remove a computer: ' || n, n = 1);

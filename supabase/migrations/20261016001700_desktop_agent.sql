@@ -290,8 +290,7 @@ declare d public.agent_devices%rowtype;
 begin
   update public.agent_devices set revoked_at = now() where id = p_device and person_id = p_person and revoked_at is null returning * into d;
   if not found then return false; end if;
-  insert into public.audit_log (organization_id, actor, action, entity, entity_id, details)
-  values (d.organization_id, null, 'agent.revoked', 'agent_device', d.id::text, jsonb_build_object('person_id', d.person_id, 'device_name', d.device_name, 'by', 'employee'));
+  -- the audit_agent_devices trigger records the removal
   return true;
 end $$;
 
