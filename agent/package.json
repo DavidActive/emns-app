@@ -18,14 +18,38 @@
   "build": {
     "appId": "com.activesos.emns.agent",
     "productName": "Active SOS eMNS",
-    "directories": { "output": "dist" },
-    "files": ["src/**/*", "package.json"],
-    "extraResources": [{ "from": "config.example.json", "to": "config.json" }],
-    "win": {
-      "target": ["nsis", "msi"],
-      "artifactName": "ActiveSOS-eMNS-Agent-${version}-${arch}.${ext}"
+    "directories": {
+      "output": "dist"
     },
-    "nsis": { "oneClick": false, "perMachine": true, "allowToChangeInstallationDirectory": false, "runAfterFinish": true },
-    "msi": { "oneClick": false, "perMachine": true }
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "config.example.json",
+        "to": "config.json"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "msi"
+      ],
+      "artifactName": "ActiveSOS-eMNS-Agent-${version}-${arch}.${ext}",
+      "icon": "build/icon.ico",
+      "executableName": "ActiveSOS-eMNS"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": false,
+      "runAfterFinish": true
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": true
+    },
+    "icon": "build/icon.ico"
   }
 }
