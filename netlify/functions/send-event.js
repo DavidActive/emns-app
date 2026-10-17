@@ -9,6 +9,7 @@
 //
 // Request:  POST { kind: 'alert'|'drill'|'test', body?, group_ids?: [uuid], scenario_id?: uuid, requires_ack?: boolean, idempotency_key?: string,
 //                  channels?: ['sms'|'email'|'voice', ...] (default ['sms']; order matters in fallback mode),
+//                  fallback_after_seconds?: 0-86400 (fallback mode only; 0 = move to the next channel only when one fails; N = also move on if the person has not acknowledged within N seconds),
 //                  mode?: 'together'|'fallback' (default 'together'; fallback sends the first usable channel and the next one only if it fails),
 //                  email_subject?: string,
 //                  voice_text?: string (what is spoken on a call; defaults to the message),
@@ -87,6 +88,7 @@ exports.handler = async (event) => {
   }
   const mode = payload.mode === undefined ? 'together' : payload.mode;
   if (!MODES.includes(mode)) return json(400, { error: 'mode must be together or fallback.' });
+  const fallbackAfter = mode === 'fallback' ? clampInt(payload.fallback_after_seconds, 0, 86400, 0) : 0;
   const scenarioEmail = scenario && scenario.bodies && scenario.bodies.email && typeof scenario.bodies.email === 'object' ? scenario.bodies.email : {};
   const emailSubjectGiven = typeof payload.email_subject === 'string' && payload.email_subject.trim() ? payload.email_subject : (typeof scenarioEmail.subject === 'string' ? scenarioEmail.subject : '');
 
@@ -141,6 +143,10 @@ exports.handler = async (event) => {
     return json(/group|body|kind|channel|mode|subject|voice/i.test(msg) ? 400 : 500, { error: msg });
   }
 
+  if (!data.deduplicated && fallbackAfter > 0) {
+    const { error: fbErr } = await supabase.from('notification_events').update({ fallback_after_seconds: fallbackAfter }).eq('id', data.event_id);
+    if (fbErr) console.error('could not set fallback delay', fbErr.message);
+  }
   if (!data.deduplicated && data.queued > 0) await kickWorker(event);
   return json(200, { ok: true, ...data });
 };

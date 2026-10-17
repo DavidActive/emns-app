@@ -36,6 +36,7 @@ export default function ComposePage() {
   const [voiceAudience, setVoiceAudience] = useState<Audience | null>(null);
   const [order, setOrder] = useState<Channel[]>(['sms']); // the order boxes were ticked: it is the order used in "in this order" mode
   const [mode, setMode] = useState<Mode>('together');
+  const [fallbackMinutes, setFallbackMinutes] = useState(0); // 0 = move on only when a channel fails
   const [subject, setSubject] = useState('');
   const [voiceAttempts, setVoiceAttempts] = useState(2);
   const [voiceMinutes, setVoiceMinutes] = useState(2);
@@ -122,6 +123,7 @@ export default function ComposePage() {
       await callFunction('send-event', {
         kind, body, group_ids: selected, requires_ack: ack, scenario_id: scenarioId || undefined, idempotency_key: key,
         channels: order, mode: effectiveMode,
+        fallback_after_seconds: effectiveMode === 'fallback' && ack ? Math.round(fallbackMinutes * 60) : undefined,
         email_subject: usesEmail ? subject : undefined,
         voice_max_attempts: usesVoice ? voiceAttempts : undefined,
         voice_retry_seconds: usesVoice ? Math.round(voiceMinutes * 60) : undefined,
@@ -169,6 +171,12 @@ export default function ComposePage() {
               <label style={{ display: 'block' }}><input type="radio" name="mode" checked={mode === 'together'} onChange={() => setMode('together')} /> All at once</label>
               <label style={{ display: 'block' }}><input type="radio" name="mode" checked={mode === 'fallback'} onChange={() => setMode('fallback')} /> In this order, moving on only if one fails: <strong>{order.map((c) => NAME[c]).join(' → ')}</strong></label>
               {mode === 'fallback' && <div style={note}>The order is the order you ticked the boxes. Untick and tick again to change it.</div>}
+              {mode === 'fallback' && ack && (
+                <label style={{ display: 'block', marginTop: 6 }}>Also move on if there is no answer within{' '}
+                  <input type="number" min={0} max={1440} value={fallbackMinutes} onChange={(e) => setFallbackMinutes(Math.min(1440, Math.max(0, Number(e.target.value) || 0)))} style={{ width: 70 }} /> minutes
+                  <span style={note}> (0 = only when a channel fails)</span>
+                </label>
+              )}
             </div>
           )}
         </fieldset>

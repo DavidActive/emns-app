@@ -10,6 +10,10 @@ exports.handler = async () => {
   const env = process.env;
   if (!env.EMNS_WORKER_SECRET) return { statusCode: 200, body: 'EMNS_WORKER_SECRET not set; sweeper idle' };
   const db = getDb();
+  // Timed fallback: release the next channel for people who have not acknowledged in time.
+  const esc = await db.rpc('escalate_unacknowledged');
+  if (esc.error) console.error('escalate_unacknowledged failed', esc.error.message);
+  const escalated = esc.data || 0;
   const nowIso = new Date().toISOString();
   const staleIso = new Date(Date.now() - LEASE_SECONDS * 1000).toISOString();
   const { count, error } = await db
@@ -17,7 +21,7 @@ exports.handler = async () => {
     .select('id', { count: 'exact', head: true })
     .or(`and(status.eq.queued,next_attempt_at.lte.${nowIso}),and(status.eq.sending,locked_at.lt.${staleIso})`);
   if (error) { console.error('send-sweeper query failed', error.message); return { statusCode: 500, body: error.message }; }
-  if (!count) return { statusCode: 200, body: 'idle' };
+  if (!count && !escalated) return { statusCode: 200, body: 'idle' };
   const base = (env.URL || '').replace(/\/$/, '');
   if (!base) return { statusCode: 200, body: 'URL not set' };
   await fetch(`${base}/.netlify/functions/send-worker-background`, { method: 'POST', headers: { 'x-emns-worker-secret': env.EMNS_WORKER_SECRET } });

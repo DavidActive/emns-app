@@ -137,3 +137,21 @@ test('worker secret check is constant-time and required', () => {
   assert.equal(secretOk({ headers: {} }, { EMNS_WORKER_SECRET: 'abc' }), false);
   assert.equal(secretOk({ headers: { 'x-emns-worker-secret': '' } }, {}), false);
 });
+
+test('fallback_after_seconds is stored on the event only in fallback mode and is clamped', async () => {
+  const fn = loadFunction('send-event');
+  const upd = (db) => db.calls.find((c) => c.table === 'notification_events' && c.op === 'update');
+  let db = setup(operator('admin'));
+  await fn.handler(req({ kind: 'drill', body: 'x', group_ids: [G1], channels: ['sms', 'email'], mode: 'fallback', fallback_after_seconds: 300 }));
+  assert.deepEqual(upd(db).payload, { fallback_after_seconds: 300 });
+  assert.deepEqual(upd(db).filters, [['id', 'e1']]);
+  db = setup(operator('admin'));
+  await fn.handler(req({ kind: 'drill', body: 'x', group_ids: [G1], channels: ['sms', 'email'], mode: 'fallback', fallback_after_seconds: 999999 }));
+  assert.equal(upd(db).payload.fallback_after_seconds, 86400);
+  db = setup(operator('admin'));
+  await fn.handler(req({ kind: 'drill', body: 'x', group_ids: [G1], channels: ['sms', 'email'], mode: 'together', fallback_after_seconds: 300 }));
+  assert.equal(upd(db), undefined, 'ignored when channels go together');
+  db = setup(operator('admin'));
+  await fn.handler(req({ kind: 'drill', body: 'x', group_ids: [G1], channels: ['sms', 'email'], mode: 'fallback' }));
+  assert.equal(upd(db), undefined, 'default 0 needs no update');
+});

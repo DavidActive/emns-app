@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import EventTimeline from '../components/EventTimeline';
 
 type Status = 'sos' | 'unaccounted' | 'pending' | 'replied' | 'safe' | 'not_contacted';
 interface Person { person_id: string; full_name: string; mobile_phone: string; delivery_status: string; error_code: string | null; responded_at: string | null; last_text: string | null; reply_count: number; status: Status }
@@ -85,6 +86,7 @@ export default function RollCallPage() {
           </tbody>
         </table>
       </div>
+      <EventTimeline eventId={data.event.id} live={live} />
     </div>
   );
 }
