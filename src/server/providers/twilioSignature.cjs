@@ -1,6 +1,7 @@
 // Twilio request-signature verification (single shared copy; replaces helpers inlined in each function).
 // Enforcement is ON by default in eMNS. Set TWILIO_ENFORCE_SIGNATURE=false only for local debugging; it has no effect when CONTEXT=production.
 const crypto = require('crypto');
+const { isProduction, publicBaseUrl } = require('../runtime.cjs');
 
 function validateTwilioRequest(authToken, signature, url, params) {
   if (!authToken || !signature) return false;
@@ -16,12 +17,12 @@ function baseUrl(event, env = process.env) {
   const h = event.headers || {};
   const proto = h['x-forwarded-proto'] || 'https';
   const host = h['x-forwarded-host'] || h.host;
-  return `${proto}://${host}`;
+  return `${proto}://${host}`; // the address Twilio called: never the EMNS_BASE_URL override, which could differ behind a proxy
 }
 
 function checkTwilioSignature(event, params, functionName, env = process.env) {
   // The debug switch is ignored on the production deploy (Netlify sets CONTEXT=production there).
-  const enforce = env.TWILIO_ENFORCE_SIGNATURE !== 'false' || env.CONTEXT === 'production';
+  const enforce = env.TWILIO_ENFORCE_SIGNATURE !== 'false' || isProduction(env);
   const signature = (event.headers || {})['x-twilio-signature'] || '';
   const url = `${baseUrl(event, env)}/.netlify/functions/${functionName}`;
   let valid = false;

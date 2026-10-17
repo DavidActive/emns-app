@@ -14,6 +14,12 @@ function createSupabaseAuthProvider(db) {
       if (error || !data || !data.user) return { ok: false, reason: 'invalid or expired session' };
       return { ok: true, identity: { provider: 'supabase', key: data.user.id, email: data.user.email || null } };
     },
+    // Creates an account and emails the person an invitation. Returns { ok, userId } or { ok: false, reason }.
+    async inviteUser(email) {
+      const { data, error } = await db.auth.admin.inviteUserByEmail(email);
+      if (error || !data || !data.user) return { ok: false, reason: (error && error.message) || 'could not invite' };
+      return { ok: true, userId: data.user.id };
+    },
   };
 }
 
@@ -25,6 +31,7 @@ function createOidcAuthProvider({ issuer, audience, getJwks, now = () => Date.no
   if (!issuer || !audience || typeof getJwks !== 'function') throw new Error('OIDC needs issuer, audience and a JWKS source.');
   return {
     name: 'oidc',
+    async inviteUser() { return { ok: false, reason: 'Accounts are created in your identity provider. Link an existing identity instead.' }; },
     async verify(token) {
       if (!token) return { ok: false, reason: 'missing token' };
       const parts = token.split('.');
@@ -77,4 +84,7 @@ function getAuthProvider(db, env = process.env) {
   throw new Error(`Unknown EMNS_AUTH_PROVIDER "${choice}".`);
 }
 
-module.exports = { createSupabaseAuthProvider, createOidcAuthProvider, getAuthProvider, setAuthProviderForTests };
+// Staff (operators) always sign in with the built-in account system; EMNS_AUTH_PROVIDER selects how EMPLOYEES sign in (my-contact).
+function getStaffAuthProvider(db) { return createSupabaseAuthProvider(db); }
+
+module.exports = { createSupabaseAuthProvider, createOidcAuthProvider, getAuthProvider, getStaffAuthProvider, setAuthProviderForTests };

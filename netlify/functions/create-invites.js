@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
 const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
+const { publicBaseUrl } = require('../../src/server/runtime.cjs');
 const { getEmailProvider } = require('../../src/server/providers/index.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] });
 
@@ -77,7 +78,7 @@ exports.handler = async (event) => {
   });
   if (error) { console.error('create-invites: rpc failed', error); return json(500, { error: 'Could not create the links.' }); }
 
-  const base = (process.env.URL || `https://${(event.headers || {}).host}`).replace(/\/$/, '');
+  const base = publicBaseUrl(event);
   const made = new Set(created || []);
   const invites = people.filter((p) => made.has(p.id)).map((p) => ({
     person_id: p.id, full_name: p.full_name, email: p.email, mobile_phone: p.mobile_phone, link: `${base}/enroll/${tokens.get(p.id)}`,

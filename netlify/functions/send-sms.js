@@ -20,6 +20,7 @@ const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests
 
 const { getMessageProvider } = require('../../src/server/providers/index.cjs');
 const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
+const { getStaffAuthProvider } = require('../../src/server/auth/authProvider.cjs');
 
 const SENDER_ROLES = ['admin', 'sender', 'operator'];
 const MAX_BODY = 1600; // Twilio's hard limit per message
@@ -33,8 +34,9 @@ exports.handler = async (event) => {
   const authHeader = event.headers.authorization || event.headers.Authorization || '';
   const token = authHeader.replace(/^Bearer\s+/i, '');
   if (!token) return json(401, { error: 'Missing Authorization header.' });
-  const { data: callerAuth, error: callerAuthError } = await supabase.auth.getUser(token);
-  if (callerAuthError || !callerAuth?.user) return json(401, { error: 'Invalid or expired session.' });
+  const verified = await getStaffAuthProvider(supabase).verify(token);
+  if (!verified.ok) return json(401, { error: 'Invalid or expired session.' });
+  const callerAuth = { user: { id: verified.identity.key } };
 
   const { data: caller } = await supabase
     .from('operators')

@@ -3,6 +3,7 @@
 // Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, EMNS_WORKER_SECRET.
 
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
+const { internalBaseUrl, functionUrl } = require('../../src/server/runtime.cjs');
 
 const LEASE_SECONDS = 120;
 
@@ -22,8 +23,8 @@ exports.handler = async () => {
     .or(`and(status.eq.queued,next_attempt_at.lte.${nowIso}),and(status.eq.sending,locked_at.lt.${staleIso})`);
   if (error) { console.error('send-sweeper query failed', error.message); return { statusCode: 500, body: error.message }; }
   if (!count && !escalated) return { statusCode: 200, body: 'idle' };
-  const base = (env.URL || '').replace(/\/$/, '');
+  const base = internalBaseUrl({}, env);
   if (!base) return { statusCode: 200, body: 'URL not set' };
-  await fetch(`${base}/.netlify/functions/send-worker-background`, { method: 'POST', headers: { 'x-emns-worker-secret': env.EMNS_WORKER_SECRET } });
+  await fetch(functionUrl(base, 'send-worker-background'), { method: 'POST', headers: { 'x-emns-worker-secret': env.EMNS_WORKER_SECRET } });
   return { statusCode: 200, body: `woke worker for ${count} pending deliveries` };
 };

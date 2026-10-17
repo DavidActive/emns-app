@@ -22,6 +22,7 @@
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
 const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
+const { internalBaseUrl, functionUrl } = require('../../src/server/runtime.cjs');
 const { formatMessage } = require('../../src/server/broadcast/messageFormat.cjs');
 const { formatEmail } = require('../../src/server/broadcast/emailFormat.cjs');
 const { formatVoice } = require('../../src/server/broadcast/voiceFormat.cjs');
@@ -40,9 +41,9 @@ const MODES = ['together', 'fallback'];
 async function kickWorker(event, env = process.env, fetchImpl = globalThis.fetch) {
   const secret = env.EMNS_WORKER_SECRET;
   if (!secret) return false; // the per-minute sweeper will still pick the work up
-  const base = (env.URL || `https://${(event.headers || {}).host}`).replace(/\/$/, '');
+  const base = internalBaseUrl(event, env);
   try {
-    await fetchImpl(`${base}/.netlify/functions/send-worker-background`, { method: 'POST', headers: { 'x-emns-worker-secret': secret } });
+    await fetchImpl(functionUrl(base, 'send-worker-background'), { method: 'POST', headers: { 'x-emns-worker-secret': secret } });
     return true;
   } catch (e) {
     console.error('send-event: could not wake worker', e);

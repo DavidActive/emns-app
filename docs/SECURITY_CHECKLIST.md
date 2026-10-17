@@ -26,7 +26,7 @@ Status as of the P14 build. Re-run the commands before each release. Items marke
 - [x] Staff functions verify the caller server-side (AuthProvider or requireOperator) and take recipients from the database, never from the request.
 - [x] Rate limits (database-backed, per caller, fails open so an outage cannot block an alert): send-event 20/min, create-invites 30/min, send-sms 60/min, link-employee 20/min, invite-staff 10/min, my-contact 30 per 10 min, public enroll 10 POST / 60 GET per minute per address.
 - [ ] **Open:** Twilio webhook endpoints are protected by signature, not rate limit. Consider a Netlify/edge rate rule if abuse appears.
-- [ ] **Open:** add an edge or WAF rate rule on the whole site once it moves to emns.activesos.com (P15 infrastructure).
+- [x] Whole-site rate rule and AWS managed rules: included in `infra/aws` (web firewall on the load balancer). **Open:** apply it, and add the equivalent Netlify-side rule while the pilot stays on Netlify.
 
 ## Routes and functions inventory (reviewed, nothing unused found)
 Functions: create-invites, email-webhook, enroll (public, token-gated), invite-staff (platform admin), link-employee (admin), my-contact (employee), send-event, send-sms, send-sweeper (scheduled), send-worker-background (secret-gated), sms-status, sms-webhook, voice-gather, voice-status, voice-twiml. Every one is called by the app, Twilio, Resend or the scheduler.

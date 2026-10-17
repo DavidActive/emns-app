@@ -6,6 +6,7 @@
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
 const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
+const { getStaffAuthProvider } = require('../../src/server/auth/authProvider.cjs');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 exports.handler = async (event) => {
@@ -26,9 +27,9 @@ exports.handler = async (event) => {
   else if (typeof p.idp_subject === 'string' && p.idp_subject.trim()) subject = p.idp_subject.trim().slice(0, 500);
   else {
     if (!person.email) return json(400, { error: 'This person has no email address to send the invitation to.' });
-    const { data: invited, error: invErr } = await db.auth.admin.inviteUserByEmail(person.email);
-    if (invErr || !invited || !invited.user) return json(409, { error: 'Could not invite that email address. It may already have an account.' });
-    userId = invited.user.id;
+    const invited = await getStaffAuthProvider(db).inviteUser(person.email);
+    if (!invited.ok) return json(409, { error: 'Could not invite that email address. It may already have an account, or this site signs in through your identity provider.' });
+    userId = invited.userId;
   }
   const { data: ok, error: linkErr } = await db.rpc('link_person_identity', {
     p_org: operator.organization_id, p_person: person.id, p_actor: operator.id, p_user_id: userId, p_idp_subject: subject,

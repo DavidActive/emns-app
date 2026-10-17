@@ -11,8 +11,5 @@ async function rateLimit(db, key, limit, windowSeconds) {
   return { ok: true };
 }
 const tooMany = (r) => json(429, { error: 'Too many requests. Please wait a moment and try again.' }, { 'Retry-After': String(r.retryAfter) });
-function clientIp(event) {
-  const h = event.headers || {};
-  return (h['x-nf-client-connection-ip'] || (h['x-forwarded-for'] || '').split(',')[0] || 'unknown').trim();
-}
+const { clientIp } = require('./runtime.cjs');
 module.exports = { rateLimit, tooMany, clientIp };

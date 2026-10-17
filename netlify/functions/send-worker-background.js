@@ -10,6 +10,7 @@ const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { getMessageProvider, getEmailProvider, getVoiceProvider } = require('../../src/server/providers/index.cjs');
 const { runWorker } = require('../../src/server/broadcast/worker.cjs');
 const { baseUrl } = require('../../src/server/providers/twilioSignature.cjs');
+const { internalBaseUrl, functionUrl } = require('../../src/server/runtime.cjs');
 
 const RUN_BUDGET_MS = 13 * 60 * 1000;
 
@@ -54,8 +55,8 @@ exports.handler = async (event) => {
 
   if (stats.timedOut) { // more work remains: continue in a fresh invocation
     try {
-      const base = (env.URL || baseUrl(event, env)).replace(/\/$/, '');
-      await fetch(`${base}/.netlify/functions/send-worker-background`, { method: 'POST', headers: { 'x-emns-worker-secret': env.EMNS_WORKER_SECRET } });
+      const base = internalBaseUrl(event, env);
+      await fetch(functionUrl(base, 'send-worker-background'), { method: 'POST', headers: { 'x-emns-worker-secret': env.EMNS_WORKER_SECRET } });
     } catch (e) { console.error('send-worker: could not chain next run', e); }
   }
   return { statusCode: 200, body: JSON.stringify(stats) };

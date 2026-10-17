@@ -12,6 +12,7 @@
 
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
+const { getStaffAuthProvider } = require('../../src/server/auth/authProvider.cjs');
 
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
@@ -26,8 +27,10 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization header.' }) };
   }
 
-  const { data: callerAuth, error: callerAuthError } = await supabase.auth.getUser(token);
-  if (callerAuthError || !callerAuth?.user) {
+  const callerAuth = { user: { id: null } };
+  const verified = await getStaffAuthProvider(supabase).verify(token);
+  if (verified.ok) callerAuth.user.id = verified.identity.key;
+  if (!verified.ok) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) };
   }
 
@@ -49,13 +52,13 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'email and organization_id are required.' }) };
   }
 
-  const { data: invited, error } = await supabase.auth.admin.inviteUserByEmail(email);
-  if (error) {
-    return { statusCode: 400, body: JSON.stringify({ error: error.message }) };
+  const invited = await getStaffAuthProvider(supabase).inviteUser(email);
+  if (!invited.ok) {
+    return { statusCode: 400, body: JSON.stringify({ error: invited.reason }) };
   }
 
   const { error: insertError } = await supabase.from('operators').insert({
-    user_id: invited.user.id,
+    user_id: invited.userId,
     organization_id,
     full_name,
     role: role || 'operator',

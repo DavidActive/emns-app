@@ -4,3 +4,4 @@ dist
 .env.local
 .netlify
 tsconfig.tsbuildinfo
+.env.docker
