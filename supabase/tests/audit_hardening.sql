@@ -58,7 +58,8 @@ begin
   exception when others then out := array_append(out, '12 non-staff users cannot log exports (ok)'); end;
   begin perform public.check_rate_limit('k', 1, 60); out := array_append(out, '13 signed-in user can use the limiter (FAIL)');
   exception when others then out := array_append(out, '13 signed-in users cannot call the limiter (ok)'); end;
-  select count(*) into n from public.rate_limits; out := array_append(out, '14 signed-in user cannot read limiter state: '||n||case when n=0 then ' (ok)' else ' (FAIL)' end);
+  begin select count(*) into n from public.rate_limits; out := array_append(out, '14 signed-in user can read limiter state (FAIL)');
+  exception when others then out := array_append(out, '14 signed-in users cannot read limiter state (ok)'); end;
   reset role;
 
   -- 5. Rate limiter
