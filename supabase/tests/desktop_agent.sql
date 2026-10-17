@@ -149,7 +149,8 @@ begin
   out := out || pg_temp.ck(42, 'an admin can remove a computer: ' || n, n = 1);
   reset role;
   select count(*) into n from public.audit_log where organization_id = o and action = 'agent.revoked';
-  out := out || pg_temp.ck(43, 'both removals are in the audit log: ' || n, n = 2);
+  out := out || pg_temp.ck(43, 'both removals are in the audit log: ' || n || case when n = 2 then '' else ' -> ' || (select string_agg(entity_id || ' by=' || coalesce(actor::text,'null') || ' ' || coalesce(details::text,''), ' | ') from public.audit_log where organization_id = o and action = 'agent.revoked') end
+        || ' [old_rpc=' || (position('''by'', ''employee''' in pg_get_functiondef('public.revoke_agent_device_for_person(uuid,uuid)'::regprocedure)) > 0)::text || ']', n = 2);
   r := public.agent_claim('tok-3b');
   out := out || pg_temp.ck(44, 'the computer an admin removed is refused', r->>'reason' = 'revoked');
 
