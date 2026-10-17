@@ -13,6 +13,7 @@ export interface StaffProfile {
 interface AuthContextValue {
   session: Session | null;
   staff: StaffProfile | null;
+  staffLoaded: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -20,6 +21,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   session: null,
   staff: null,
+  staffLoaded: false,
   loading: true,
   signOut: async () => {},
 });
@@ -27,6 +29,7 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [staff, setStaff] = useState<StaffProfile | null>(null);
+  const [staffLoaded, setStaffLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,14 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session?.user) {
       setStaff(null);
+      setStaffLoaded(true);
       return;
     }
+    setStaffLoaded(false);
     supabase
       .from('operators')
       .select('id, organization_id, full_name, role, is_platform_admin')
       .eq('user_id', session.user.id)
       .maybeSingle()
-      .then(({ data }) => setStaff(data as StaffProfile | null));
+      .then(({ data }) => { setStaff(data as StaffProfile | null); setStaffLoaded(true); });
   }, [session]);
 
   const signOut = async () => {
@@ -58,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, staff, loading, signOut }}>
+    <AuthContext.Provider value={{ session, staff, staffLoaded, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -83,6 +83,15 @@ export default function PersonEditPage() {
     } catch (e) { setLinkMsg((e as Error).message); }
   };
 
+  const [signInMsg, setSignInMsg] = useState<string | null>(null);
+  const inviteSignIn = async () => {
+    setSignInMsg(null);
+    try {
+      await callFunction('link-employee', { person_id: id });
+      setSignInMsg(`Invitation sent to ${form.email}. They set a password, then can edit their own mobile number and email.`);
+    } catch (e) { setSignInMsg((e as Error).message); }
+  };
+
   const makeLink = async () => {
     setLinkMsg(null); setLink(null);
     try {
@@ -219,6 +228,12 @@ export default function PersonEditPage() {
           </button>
         </div>
       </div>
+      {!isNew && id && staff?.role === 'admin' && form.email.trim() && (
+        <div style={{ marginTop: 12 }}>
+          <button onClick={inviteSignIn}>Let them sign in to edit their own details</button>
+          {signInMsg && <span style={{ marginLeft: 8 }}>{signInMsg}</span>}
+        </div>
+      )}
       {!isNew && id && <PersonRelations personId={id} canEdit={canEdit} />}
     </div>
   );

@@ -20,11 +20,20 @@ import ComposePage from './pages/ComposePage';
 import EventsPage from './pages/EventsPage';
 import RollCallPage from './pages/RollCallPage';
 import AfterActionPage from './pages/AfterActionPage';
+import MyContactPage from './pages/MyContactPage';
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { session, loading } = useAuth();
   if (loading) return <div style={{ padding: 40 }}>Loading…</div>;
   if (!session) return <Navigate to="/login" replace />;
+  return children;
+}
+
+// Staff get the full app. A signed-in account with no staff profile is an employee: they see only their own contact page.
+function StaffOnly({ children }: { children: JSX.Element }) {
+  const { staff, staffLoaded } = useAuth();
+  if (!staffLoaded) return <div style={{ padding: 40 }}>Loading…</div>;
+  if (!staff) return <Navigate to="/me" replace />;
   return children;
 }
 
@@ -54,11 +63,14 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/set-password" element={<SetPasswordPage />} />
       <Route path="/enroll/:token" element={<EnrollPage />} />
+      <Route path="/me" element={<RequireAuth><MyContactPage /></RequireAuth>} />
       <Route
         path="/"
         element={
           <RequireAuth>
-            <AppShell />
+            <StaffOnly>
+              <AppShell />
+            </StaffOnly>
           </RequireAuth>
         }
       >
