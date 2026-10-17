@@ -10,12 +10,14 @@ const { createMockEmailProvider } = require('../src/server/providers/mockEmailPr
 const P1 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
 const P2 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2';
 const P3 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3';
+const P4 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4';
 const op = (role) => ({ id: 'op1', organization_id: 'org1', role, is_platform_admin: false });
 const req = (body, token = 'good') => ({ httpMethod: 'POST', headers: { authorization: `Bearer ${token}`, host: 'x.netlify.app' }, body: JSON.stringify(body) });
 const people = [
   { id: P1, full_name: 'Sam One', email: 's@x.com', mobile_phone: '+15550000001', consent_status: 'pending', is_active: true },
   { id: P2, full_name: 'Pat Two', email: null, mobile_phone: '+15550000002', consent_status: 'withdrawn', is_active: true },
-  { id: P3, full_name: 'Done Three', email: null, mobile_phone: '+15550000003', consent_status: 'consented', is_active: true },
+  { id: P3, full_name: 'Done Three', email: null, mobile_phone: '+15550000003', consent_status: 'consented', voice_consent_status: 'consented', is_active: true },
+  { id: P4, full_name: 'Texts Four', email: null, mobile_phone: '+15550000004', consent_status: 'consented', voice_consent_status: 'pending', is_active: true },
 ];
 
 function setup(operator, rpcImpl, peopleRows) {
@@ -112,4 +114,14 @@ test('a failed email send keeps the link for hand delivery', async () => {
   assert.equal(out.email_failed, 1);
   assert.equal(out.invites.length, 1);
   setEmailProviderForTests(null);
+});
+
+test('include_voice also creates links for people who agreed to texts but not to calls; the default does not', async () => {
+  const fn = loadFunction('create-invites');
+  setup(op('admin'));
+  const plain = JSON.parse((await fn.handler(req({}))).body);
+  assert.deepEqual(plain.invites.map((i) => i.person_id).sort(), [P1, P2], 'default: only people without text consent');
+  setup(op('admin'));
+  const withVoice = JSON.parse((await fn.handler(req({ include_voice: true }))).body);
+  assert.deepEqual(withVoice.invites.map((i) => i.person_id).sort(), [P1, P2, P4], 'fully agreed people never get a link');
 });

@@ -14,6 +14,8 @@ interface PersonRow {
   is_active: boolean;
   sms_opted_out: boolean;
   consent_status: 'pending' | 'consented' | 'withdrawn';
+  voice_consent_status: 'pending' | 'consented' | 'withdrawn';
+  voice_opted_out: boolean;
 }
 interface GroupOpt { id: string; name: string }
 
@@ -36,7 +38,7 @@ export default function PeoplePage() {
   useEffect(() => {
     supabase
       .from('people')
-      .select('id, full_name, employee_id, mobile_phone, email, is_active, sms_opted_out, consent_status')
+      .select('id, full_name, employee_id, mobile_phone, email, is_active, sms_opted_out, consent_status, voice_consent_status, voice_opted_out')
       .order('full_name')
       .limit(10000)
       .then(({ data }) => setPeople((data as PersonRow[]) ?? []));
@@ -62,9 +64,10 @@ export default function PeoplePage() {
     });
   }, [people, query, groupId, status, consent, membership]);
 
-  const downloadInvites = async () => {
-    const targets = rows.filter((p) => p.is_active && p.consent_status !== 'consented');
-    if (targets.length === 0) { setMsg('Everyone shown has already agreed to texts.'); return; }
+  // voice = false: links for people who have not agreed to texts. voice = true: links for people who agreed to texts but not yet to voice calls.
+  const downloadInvites = async (voice = false) => {
+    const targets = rows.filter((p) => p.is_active && (voice ? p.consent_status === 'consented' && p.voice_consent_status !== 'consented' && !p.voice_opted_out : p.consent_status !== 'consented'));
+    if (targets.length === 0) { setMsg(voice ? 'Everyone shown has already agreed to voice calls (or has no text agreement yet).' : 'Everyone shown has already agreed to texts.'); return; }
     if (!window.confirm(`Create one-time enrollment links for ${targets.length} people? Any unused link they already have is replaced. The file you download contains private links: send each person only their own.`)) return;
     setBusy(true); setMsg(null);
     try {
@@ -72,13 +75,13 @@ export default function PeoplePage() {
       if (logError) throw new Error('Could not record this export, so nothing was created: ' + logError.message);
       const all: { full_name: string; email: string | null; mobile_phone: string; link: string }[] = [];
       for (let i = 0; i < targets.length; i += 1000) {
-        const r = await callFunction<{ invites: typeof all }>('create-invites', { person_ids: targets.slice(i, i + 1000).map((p) => p.id) });
+        const r = await callFunction<{ invites: typeof all }>('create-invites', { person_ids: targets.slice(i, i + 1000).map((p) => p.id), include_voice: voice });
         all.push(...r.invites);
       }
       const esc = (v: string | null) => `"${(v ?? '').replace(/"/g, '""')}"`;
       const csv = ['name,email,phone,link', ...all.map((r) => [esc(r.full_name), esc(r.email), esc(r.mobile_phone), esc(r.link)].join(','))].join('\r\n');
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-      const a = document.createElement('a'); a.href = url; a.download = 'enrollment-links.csv'; a.click(); URL.revokeObjectURL(url);
+      const a = document.createElement('a'); a.href = url; a.download = voice ? 'call-consent-links.csv' : 'enrollment-links.csv'; a.click(); URL.revokeObjectURL(url);
       setMsg(`Created ${all.length} links (30 days). The file was downloaded. Links cannot be shown again.`);
     } catch (e) { setMsg((e as Error).message); }
     setBusy(false);
@@ -107,7 +110,8 @@ export default function PeoplePage() {
         {canEdit && (
           <div style={{ display: 'flex', gap: 10 }}>
             <button disabled={busy} onClick={emailInvites} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>Email invite links</button>
-            <button disabled={busy} onClick={downloadInvites} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>{busy ? 'Working…' : 'Download invite links'}</button>
+            <button disabled={busy} onClick={() => downloadInvites(false)} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>{busy ? 'Working…' : 'Download invite links'}</button>
+            <button disabled={busy} onClick={() => downloadInvites(true)} title="For people who agreed to texts but not yet to voice calls" style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>Download call-consent links</button>
             <button onClick={() => navigate('/people/import')} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>Import CSV</button>
             <button className="btn-primary" onClick={() => navigate('/people/new')}>+ Add person</button>
           </div>
@@ -139,6 +143,7 @@ export default function PeoplePage() {
             <th style={{ padding: 10 }}>Mobile phone</th>
             <th style={{ padding: 10 }}>Groups</th>
             <th style={{ padding: 10 }}>Text consent</th>
+            <th style={{ padding: 10 }}>Call consent</th>
             <th style={{ padding: 10 }}>Status</th>
           </tr>
         </thead>
@@ -150,12 +155,13 @@ export default function PeoplePage() {
               <td style={{ padding: 10 }}>{p.mobile_phone}</td>
               <td style={{ padding: 10, fontSize: 13 }}>{(membership.get(p.id) ?? []).map((g) => groupName.get(g)).filter(Boolean).join(', ') || '—'}</td>
               <td style={{ padding: 10 }}>{p.consent_status === 'consented' && !p.sms_opted_out ? 'Agreed' : p.consent_status === 'withdrawn' || p.sms_opted_out ? 'Opted out' : 'Not yet agreed'}</td>
+              <td style={{ padding: 10 }}>{p.voice_consent_status === 'consented' && !p.voice_opted_out ? 'Agreed' : p.voice_consent_status === 'withdrawn' || p.voice_opted_out ? 'Opted out' : 'Not yet agreed'}</td>
               <td style={{ padding: 10 }}>{p.is_active ? 'Active' : 'Inactive'}</td>
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--brand-gray-600)' }}>
+              <td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--brand-gray-600)' }}>
                 {people.length === 0 ? 'No people yet. Add one, or import a CSV roster.' : 'No one matches these filters.'}
               </td>
             </tr>

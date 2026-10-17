@@ -1,6 +1,7 @@
 // Public enrollment endpoint: the page a person opens from their one-time link to agree to receive text alerts.
 // GET  ?token=...   -> what to show (organization, consent text) or why the link is not usable
-// POST { token }    -> records consent with the exact text shown, burns the link, sends ONE confirmation text
+// POST { token, text?, voice? } -> records consent with the exact text shown, burns the link, sends ONE confirmation text when texts were newly agreed.
+//   text defaults to true (older clients send only the token); voice defaults to false. Calls need their own agreement (the second box).
 // Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. The confirmation uses TWILIO_MESSAGING_SERVICE_SID via the provider
 // (mock by default; real sends only when EMNS_MESSAGE_PROVIDER=twilio and EMNS_ALLOW_REAL_SEND=true).
 //
@@ -9,7 +10,7 @@
 const crypto = require('crypto');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { getMessageProvider } = require('../../src/server/providers/index.cjs');
-const { TEXT_VERSION, LINKS, consentText, confirmationMessage } = require('../../src/server/consent/consentText.cjs');
+const { TEXT_VERSION, VOICE_TEXT_VERSION, LINKS, consentText, voiceConsentText, confirmationMessage } = require('../../src/server/consent/consentText.cjs');
 const { rateLimit, tooMany, clientIp } = require('../../src/server/rateLimit.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
@@ -24,8 +25,17 @@ exports.handler = async (event) => {
   const rl = await rateLimit(supabase, `enroll:${clientIp(event)}`, method === 'POST' ? 10 : 60, 60);
   if (!rl.ok) return tooMany(rl);
   let token = '';
+  let agreeText = true;
+  let agreeVoice = false;
   if (method === 'GET') token = (event.queryStringParameters || {}).token || '';
-  else { try { token = JSON.parse(event.body || '{}').token || ''; } catch { return json(400, { error: 'Invalid JSON.' }); } }
+  else {
+    try {
+      const b = JSON.parse(event.body || '{}');
+      token = b.token || '';
+      if (b.text === false) agreeText = false;
+      if (b.voice === true) agreeVoice = true;
+    } catch { return json(400, { error: 'Invalid JSON.' }); }
+  }
   if (typeof token !== 'string' || !TOKEN_RE.test(token)) return json(200, method === 'GET' ? { status: 'invalid' } : { ok: false, reason: 'invalid' });
   const tokenHash = hashToken(token);
 
@@ -41,19 +51,25 @@ exports.handler = async (event) => {
       status: 'valid', org_name: info.org_name, first_name: info.first_name, phone_last4: info.phone_last4,
       already_consented: info.already_consented, opted_out: info.opted_out,
       consent_text: consentText(info.org_name), text_version: TEXT_VERSION, links: LINKS,
+      voice_consented: !!info.voice_consented, voice_opted_out: !!info.voice_opted_out,
+      voice_consent_text: voiceConsentText(info.org_name), voice_text_version: VOICE_TEXT_VERSION,
     });
   }
 
   // POST: the person ticked the box and pressed the button. Record exactly the text we showed.
+  if (!agreeText && !agreeVoice) return json(400, { error: 'Nothing was selected.' });
   const { data: rec, error: recError } = await supabase.rpc('record_web_consent', {
-    p_token_hash: tokenHash, p_text: consentText(info.org_name), p_text_version: TEXT_VERSION,
+    p_token_hash: tokenHash,
+    p_text: agreeText ? consentText(info.org_name) : null, p_text_version: agreeText ? TEXT_VERSION : null,
+    p_voice_agreed: agreeVoice,
+    p_voice_text: agreeVoice ? voiceConsentText(info.org_name) : null, p_voice_text_version: agreeVoice ? VOICE_TEXT_VERSION : null,
   });
   if (recError) { console.error('enroll: record failed', recError); return json(500, { error: 'Something went wrong. Please try again.' }); }
   if (!rec || !rec.ok) return json(200, { ok: false, reason: rec?.reason || 'invalid' });
 
   // One confirmation text, only for a newly consenting person who has not opted out (the carrier would block an opted-out number).
   let confirmation = 'not_needed';
-  if (!rec.already_consented && !rec.opted_out) {
+  if (agreeText && !rec.already_consented && !rec.opted_out) {
     try {
       await getMessageProvider().send({
         channel: 'sms', to: rec.to, body: confirmationMessage(rec.org_name),
@@ -65,6 +81,6 @@ exports.handler = async (event) => {
       confirmation = 'not_sent'; // consent is already recorded; the missing confirmation never undoes it
     }
   }
-  return json(200, { ok: true, org_name: rec.org_name, opted_out: rec.opted_out, confirmation });
+  return json(200, { ok: true, org_name: rec.org_name, opted_out: rec.opted_out, confirmation, voice: agreeVoice });
 };
 exports.hashToken = hashToken;

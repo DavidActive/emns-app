@@ -13,16 +13,16 @@ begin
   insert into groups (organization_id,name) values (o,'All') returning id into g;
   insert into groups (organization_id,name) values (o,'Pair') returning id into g2;
   insert into groups (organization_id,name) values (o,'Gate') returning id into g3;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'V1','+15551000001','consented') returning id into v1;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'V2','+15551000002','consented') returning id into v2;
-  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_opted_out) values (o,'V3','+15551000003','consented',true) returning id into v3;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'V1','+15551000001','consented','consented') returning id into v1;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'V2','+15551000002','consented','consented') returning id into v2;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_opted_out,voice_consent_status) values (o,'V3','+15551000003','consented',true,'consented') returning id into v3;
   insert into people (organization_id,full_name,mobile_phone) values (o,'V4','+15551000004') returning id into v4;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'V5','+15551000005','consented') returning id into v5;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'V6','+15551000006','consented') returning id into v6;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'V7','+15551000007','consented') returning id into v7;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'F1','+15551000011','consented') returning id into f1;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'F2','+15551000012','consented') returning id into f2;
-  insert into people (organization_id,full_name,mobile_phone,consent_status) values (o,'G1','+15551000021','consented') returning id into g1p;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'V5','+15551000005','consented','consented') returning id into v5;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'V6','+15551000006','consented','consented') returning id into v6;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'V7','+15551000007','consented','consented') returning id into v7;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'F1','+15551000011','consented','consented') returning id into f1;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'F2','+15551000012','consented','consented') returning id into f2;
+  insert into people (organization_id,full_name,mobile_phone,consent_status,voice_consent_status) values (o,'G1','+15551000021','consented','consented') returning id into g1p;
   insert into group_members (group_id,person_id) select g, id from people where organization_id = o and full_name like 'V%';
   insert into group_members (group_id,person_id) values (g2,f1),(g2,f2),(g3,g1p);
 

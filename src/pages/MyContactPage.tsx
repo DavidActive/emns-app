@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { callFunction } from '../lib/api';
 
-interface Me { full_name: string | null; mobile_phone: string; email: string | null; consent_status: string }
+interface Me { full_name: string | null; mobile_phone: string; email: string | null; consent_status: string; voice_consent_status?: string }
 interface Device { id: string; device_name: string; platform: string; enrolled_at: string; last_seen_at: string | null }
 interface Res { organization: string | null; person: Me; changed?: string[]; consent_reset?: boolean }
 
@@ -44,7 +44,7 @@ export default function MyContactPage() {
       const r = await callFunction<Res>('my-contact', { action: 'update', mobile_phone: mobile, email });
       apply(r);
       setMsg(!r.changed || r.changed.length === 0 ? 'Nothing changed.'
-        : r.consent_reset ? 'Saved. Because your mobile number changed, you will need to agree to text alerts again. Your organization will send you a new sign-up link.'
+        : r.consent_reset ? 'Saved. Because your mobile number changed, you will need to agree to text alerts (and voice calls, if you had agreed) again. Your organization will send you a new sign-up link.'
         : 'Saved.');
     } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   };
@@ -63,7 +63,8 @@ export default function MyContactPage() {
             <label>Email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" style={input} /></label>
             <p style={{ fontSize: 13, color: 'var(--brand-gray-600)' }}>
               Text alerts: {me.consent_status === 'consented' ? 'you have agreed' : me.consent_status === 'withdrawn' ? 'you have opted out' : 'not agreed yet'}.
-              If you change your mobile number you will need to agree to text alerts again for the new number.
+              Voice calls: {me.voice_consent_status === 'consented' ? 'you have agreed' : me.voice_consent_status === 'withdrawn' ? 'you have opted out' : 'not agreed yet'}.
+              If you change your mobile number you will need to agree to text alerts and voice calls again for the new number.
             </p>
             {msg && <p role="status" style={{ color: 'var(--tier-1)' }}>{msg}</p>}
             <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>

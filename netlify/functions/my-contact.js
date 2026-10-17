@@ -22,14 +22,15 @@ exports.handler = async (event) => {
   if (!rl.ok) return tooMany(rl);
   const column = auth.identity.provider === 'oidc' ? 'idp_subject' : 'user_id';
   const { data: person } = await db.from('people')
-    .select('id, organization_id, full_name, mobile_phone, email, consent_status, is_active')
+    .select('id, organization_id, full_name, mobile_phone, email, consent_status, voice_consent_status, voice_opted_out, is_active')
     .eq(column, auth.identity.key).eq('is_active', true).maybeSingle();
   if (!person) return json(403, { error: 'This account is not linked to an employee record. Ask your administrator.' });
 
   let payload;
   try { payload = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid request.' }); }
 
-  const view = (p) => ({ full_name: p.full_name, mobile_phone: p.mobile_phone, email: p.email, consent_status: p.consent_status });
+  const view = (p) => ({ full_name: p.full_name, mobile_phone: p.mobile_phone, email: p.email, consent_status: p.consent_status,
+    voice_consent_status: p.voice_opted_out ? 'withdrawn' : p.voice_consent_status });
   if (payload.action === 'get' || payload.action === undefined) {
     const { data: org } = await db.from('organizations').select('name').eq('id', person.organization_id).maybeSingle();
     return json(200, { ok: true, organization: (org && org.name) || null, person: view(person) });
@@ -55,6 +56,6 @@ exports.handler = async (event) => {
     if (/could not be used/i.test(error.message)) return json(409, { error: 'That number could not be used. Contact your administrator.' });
     return json(500, { error: 'Could not save your changes.' });
   }
-  const { data: fresh } = await db.from('people').select('full_name, mobile_phone, email, consent_status').eq('id', person.id).maybeSingle();
+  const { data: fresh } = await db.from('people').select('full_name, mobile_phone, email, consent_status, voice_consent_status, voice_opted_out').eq('id', person.id).maybeSingle();
   return json(200, { ok: true, changed: data.changed, consent_reset: data.consent_reset, person: fresh ? view(fresh) : null });
 };

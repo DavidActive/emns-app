@@ -17,7 +17,7 @@ const MAX = 5000;
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 const PAGE = 1000;
 
-async function fetchPeople(orgId, ids, groupId) {
+async function fetchPeople(orgId, ids, groupId, includeVoice) {
   const out = [];
   let allowed = null;
   if (groupId) {
@@ -25,14 +25,15 @@ async function fetchPeople(orgId, ids, groupId) {
     allowed = new Set((gm || []).map((r) => r.person_id));
   }
   for (let from = 0; from < 100000; from += PAGE) {
-    let q = supabase.from('people').select('id, full_name, email, mobile_phone, consent_status, is_active, email_opted_out, email_bounced_at').eq('organization_id', orgId).eq('is_active', true);
+    let q = supabase.from('people').select('id, full_name, email, mobile_phone, consent_status, voice_consent_status, is_active, email_opted_out, email_bounced_at').eq('organization_id', orgId).eq('is_active', true);
     if (ids) q = q.in('id', ids);
     const { data, error } = await q.order('full_name').range(from, from + PAGE - 1);
     if (error) throw new Error(error.message);
     out.push(...(data || []));
     if (!data || data.length < PAGE || ids) break;
   }
-  return out.filter((p) => p.consent_status !== 'consented' && (!allowed || allowed.has(p.id)));
+  // Default: people who have not agreed to texts. With include_voice, also people who agreed to texts but not yet to calls.
+  return out.filter((p) => (p.consent_status !== 'consented' || (includeVoice && p.voice_consent_status !== 'consented')) && (!allowed || allowed.has(p.id)));
 }
 
 function inviteEmail(orgName, person, link) {
@@ -40,7 +41,7 @@ function inviteEmail(orgName, person, link) {
   return {
     subject: `${orgName}: please sign up for emergency text alerts`,
     body: `Hello ${first},\n\n${orgName} uses Active SOS eMNS to send emergency alerts, drills and safety check-ins by text message. `
-      + `You will not receive any texts until you agree.\n\nTo review the details and agree, open your personal link (it works once and expires in 30 days):\n${link}\n\n`
+      + `You will not receive any texts until you agree. The page also lets you choose, separately, whether to receive automated voice calls.\n\nTo review the details and agree, open your personal link (it works once and expires in 30 days):\n${link}\n\n`
       + `If you did not expect this, ignore this email or contact ${orgName}. Please do not forward this link.\n\nActive SOS eMNS\nsupport@activesos.com`,
   };
 }
@@ -62,7 +63,7 @@ exports.handler = async (event) => {
   if (payload.group_id && !UUID_RE.test(String(payload.group_id))) return json(400, { error: 'Invalid group id.' });
 
   let people;
-  try { people = await fetchPeople(operator.organization_id, ids, payload.group_id || null); }
+  try { people = await fetchPeople(operator.organization_id, ids, payload.group_id || null, payload.include_voice === true); }
   catch (e) { console.error('create-invites: roster read failed', e); return json(500, { error: 'Could not read the roster.' }); }
   if (people.length > MAX) return json(400, { error: `That is more than ${MAX} people. Filter by group and try again.` });
   if (people.length === 0) return json(200, { ok: true, created: 0, skipped: ids ? ids.length : 0, invites: [] });

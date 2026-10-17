@@ -40,7 +40,7 @@ export default function PersonEditPage() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [consent, setConsent] = useState<{ status: string; at: string | null; method: string | null; optedOut: boolean } | null>(null);
+  const [consent, setConsent] = useState<{ status: string; at: string | null; method: string | null; optedOut: boolean; voice: string; voiceAt: string | null; voiceOptedOut: boolean } | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [linkMsg, setLinkMsg] = useState<string | null>(null);
 
@@ -50,7 +50,7 @@ export default function PersonEditPage() {
     supabase
       .from('people')
       .select(
-        'full_name, employee_id, mobile_phone, email, notes, is_active, consent_status, consented_at, consent_method, sms_opted_out'
+        'full_name, employee_id, mobile_phone, email, notes, is_active, consent_status, consented_at, consent_method, sms_opted_out, voice_consent_status, voice_consented_at, voice_opted_out'
       )
       .eq('id', id)
       .single()
@@ -68,7 +68,7 @@ export default function PersonEditPage() {
           notes: data.notes ?? '',
           is_active: data.is_active ?? true,
         });
-        setConsent({ status: data.consent_status, at: data.consented_at, method: data.consent_method, optedOut: !!data.sms_opted_out });
+        setConsent({ status: data.consent_status, at: data.consented_at, method: data.consent_method, optedOut: !!data.sms_opted_out, voice: data.voice_consent_status, voiceAt: data.voice_consented_at, voiceOptedOut: !!data.voice_opted_out });
         setLoading(false);
       });
   }, [id, isNew]);
@@ -76,7 +76,7 @@ export default function PersonEditPage() {
   const emailLink = async () => {
     setLinkMsg(null); setLink(null);
     try {
-      const r = await callFunction<{ emailed: number; invites: { link: string }[] }>('create-invites', { person_ids: [id], send_email: true });
+      const r = await callFunction<{ emailed: number; invites: { link: string }[] }>('create-invites', { person_ids: [id], send_email: true, include_voice: true });
       if (r.emailed) setLinkMsg(`Link emailed to ${form.email}. It works once and will not be shown here.`);
       else if (r.invites[0]) { setLink(r.invites[0].link); setLinkMsg('Could not email this person (no usable email address or send failed). Copy the link instead.'); }
       else setLinkMsg('This person has already agreed to texts.');
@@ -95,7 +95,7 @@ export default function PersonEditPage() {
   const makeLink = async () => {
     setLinkMsg(null); setLink(null);
     try {
-      const r = await callFunction<{ invites: { link: string }[] }>('create-invites', { person_ids: [id] });
+      const r = await callFunction<{ invites: { link: string }[] }>('create-invites', { person_ids: [id], include_voice: true });
       if (r.invites[0]) setLink(r.invites[0].link); else setLinkMsg('This person has already agreed to texts.');
     } catch (e) { setLinkMsg((e as Error).message); }
   };
@@ -202,7 +202,12 @@ export default function PersonEditPage() {
             <strong>Text consent: </strong>
             {consent.status === 'consented' && !consent.optedOut ? `Agreed${consent.at ? ' on ' + new Date(consent.at).toLocaleDateString() : ''}${consent.method ? ' (' + consent.method.replace(/_/g, ' ') + ')' : ''}`
               : consent.status === 'withdrawn' || consent.optedOut ? 'Opted out (replied STOP). They can reply START to turn texts back on.' : 'Not yet agreed. They will not receive texts until they do.'}
-            {canEdit && consent.status !== 'consented' && (
+            <div style={{ marginTop: 6 }}>
+              <strong>Call consent: </strong>
+              {consent.voice === 'consented' && !consent.voiceOptedOut ? `Agreed${consent.voiceAt ? ' on ' + new Date(consent.voiceAt).toLocaleDateString() : ''}`
+                : consent.voice === 'withdrawn' || consent.voiceOptedOut ? 'Opted out (pressed 9 on a call). They can agree again on a new enrollment link.' : 'Not yet agreed. They will not receive voice calls until they do.'}
+            </div>
+            {canEdit && (consent.status !== 'consented' || (consent.voice !== 'consented' || consent.voiceOptedOut)) && (
               <div style={{ marginTop: 8 }}>
                 {form.email.trim() && <button onClick={emailLink} style={{ marginRight: 8 }}>Email enrollment link</button>}
                 <button onClick={makeLink}>Create enrollment link</button>
