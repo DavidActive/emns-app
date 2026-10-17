@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import EventTimeline from '../components/EventTimeline';
 
+const RollCallMap = lazy(() => import('../components/RollCallMap'));
+
 type Status = 'sos' | 'unaccounted' | 'pending' | 'replied' | 'safe' | 'not_contacted';
-interface Person { person_id: string; full_name: string; mobile_phone: string; delivery_status: string; error_code: string | null; responded_at: string | null; last_text: string | null; reply_count: number; status: Status }
+interface Person { person_id: string; full_name: string; mobile_phone: string; delivery_status: string; error_code: string | null; responded_at: string | null; last_text: string | null; reply_count: number; status: Status; lat?: number | null; lng?: number | null; gps_url?: string | null; last_source?: string | null }
 interface RollCall {
   event: { id: string; kind: string; status: string; body: string; requires_ack: boolean; created_at: string };
-  counts: { targeted: number; safe: number; sos: number; replied: number; responded: number; unaccounted: number; undeliverable: number; pending: number; not_contacted: number; delivered: number };
+  counts: { targeted: number; safe: number; sos: number; replied: number; responded: number; unaccounted: number; undeliverable: number; pending: number; not_contacted: number; delivered: number; located?: number };
   people: Person[];
 }
 
@@ -68,6 +70,7 @@ export default function RollCallPage() {
         {c.not_contacted > 0 && tile('Not texted', c.not_contacted, 'var(--brand-gray-600)', 'not_contacted')}
       </div>
       {c.undeliverable > 0 && <p style={{ fontSize: 14 }}>{c.undeliverable} of the unaccounted people did not receive the text (failed or undelivered). Contact them another way.</p>}
+      {data.event.requires_ack && <Suspense fallback={<p>Loading map…</p>}><RollCallMap people={data.people} /></Suspense>}
       <div className="card" style={{ overflowX: 'auto' }}>
         <div style={{ marginBottom: 8, fontSize: 14 }}>Showing <strong>{filter === 'all' ? 'everyone' : LABEL[filter]}</strong> ({rows.length}) {filter !== 'all' && <button onClick={() => setFilter('all')}>Show all</button>}</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>

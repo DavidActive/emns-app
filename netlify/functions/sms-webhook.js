@@ -274,6 +274,18 @@ exports.handler = async (event) => {
     }
   }
 
+  // --- P17: an Active SOS app alert answers the person's open notification (with its GPS), so it counts in the roll-call ---
+  // SOS (or a Safe alert whose reason escalated to SOS) is recorded as SOS; a Safe alert as SAFE. The inbox item below is still
+  // created exactly as before. If nothing is open for this person, nothing changes. A failure here never loses the alert.
+  if (isStructured && (classified.item_type === 'SOS' || classified.item_type === 'SAFE')) {
+    const { data: appAck, error: appAckError } = await supabase.rpc('record_app_alert_ack', {
+      p_org: org.id, p_person: person.id, p_response: classified.item_type, p_text: classified.message_body,
+      p_message_sid: params.get('MessageSid') || null, p_lat: classified.lat, p_lng: classified.lng, p_gps_url: classified.gps_url,
+    });
+    if (appAckError) console.error('sms-webhook: record_app_alert_ack failed', appAckError);
+    else if (appAck && appAck.duplicate) return EMPTY_TWIML; // the carrier delivered the same message twice
+  }
+
   // --- Thread onto an existing conversation when this is a plain reply ---
   const threadAlert = isStructured ? null : await findThreadAlert(org.id, person.id);
   if (threadAlert) {
