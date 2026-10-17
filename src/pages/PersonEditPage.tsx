@@ -72,6 +72,16 @@ export default function PersonEditPage() {
       });
   }, [id, isNew]);
 
+  const emailLink = async () => {
+    setLinkMsg(null); setLink(null);
+    try {
+      const r = await callFunction<{ emailed: number; invites: { link: string }[] }>('create-invites', { person_ids: [id], send_email: true });
+      if (r.emailed) setLinkMsg(`Link emailed to ${form.email}. It works once and will not be shown here.`);
+      else if (r.invites[0]) { setLink(r.invites[0].link); setLinkMsg('Could not email this person (no usable email address or send failed). Copy the link instead.'); }
+      else setLinkMsg('This person has already agreed to texts.');
+    } catch (e) { setLinkMsg((e as Error).message); }
+  };
+
   const makeLink = async () => {
     setLinkMsg(null); setLink(null);
     try {
@@ -184,12 +194,13 @@ export default function PersonEditPage() {
               : consent.status === 'withdrawn' || consent.optedOut ? 'Opted out (replied STOP). They can reply START to turn texts back on.' : 'Not yet agreed. They will not receive texts until they do.'}
             {canEdit && consent.status !== 'consented' && (
               <div style={{ marginTop: 8 }}>
+                {form.email.trim() && <button onClick={emailLink} style={{ marginRight: 8 }}>Email enrollment link</button>}
                 <button onClick={makeLink}>Create enrollment link</button>
                 {linkMsg && <span style={{ marginLeft: 8 }}>{linkMsg}</span>}
                 {link && (
                   <div style={{ marginTop: 8 }}>
                     <input readOnly value={link} onFocus={(e) => e.target.select()} style={{ width: '100%', padding: 6 }} />
-                    <small>One-time link, valid 30 days. Send it only to this person. It will not be shown again.</small>
+                    <small>One-time link, valid 30 days. Send it only to this person, by email or in person, not by text (they have not agreed to texts yet). It will not be shown again.</small>
                   </div>
                 )}
               </div>

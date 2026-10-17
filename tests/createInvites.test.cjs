@@ -4,6 +4,8 @@ const crypto = require('crypto');
 const { loadFunction } = require('./helpers/loadFunction.cjs');
 const { createFakeDb } = require('./helpers/fakeDb.cjs');
 const { setDbForTests } = require('../src/server/providers/dataStore.cjs');
+const { setEmailProviderForTests } = require('../src/server/providers/index.cjs');
+const { createMockEmailProvider } = require('../src/server/providers/mockEmailProvider.cjs');
 
 const P1 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
 const P2 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2';
@@ -16,8 +18,8 @@ const people = [
   { id: P3, full_name: 'Done Three', email: null, mobile_phone: '+15550000003', consent_status: 'consented', is_active: true },
 ];
 
-function setup(operator, rpcImpl) {
-  const db = createFakeDb({ tables: { operators: operator, people, group_members: [] }, user: { id: 'u1' },
+function setup(operator, rpcImpl, peopleRows) {
+  const db = createFakeDb({ tables: { operators: operator, people: peopleRows || people, group_members: [], organizations: { name: 'Acme Hospital' } }, user: { id: 'u1' },
     rpc: { create_enrollment_invites: rpcImpl || ((a) => ({ data: a.p_invites.map((i) => i.person_id), error: null })) } });
   setDbForTests(db);
   delete process.env.URL;
@@ -77,4 +79,37 @@ test('database errors are not leaked', async () => {
   const r = await fn.handler(req({}));
   assert.equal(r.statusCode, 500);
   assert.equal(r.body.includes('secret internal detail'), false);
+});
+
+test('send_email emails each person their own link, never texts, and withholds emailed links', async () => {
+  const fn = loadFunction('create-invites');
+  const mail = createMockEmailProvider();
+  setEmailProviderForTests(mail);
+  setup(op('admin'), null, [
+    ...people.slice(0, 2),
+    { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4', full_name: 'Opt Four', email: 'o@x.com', email_opted_out: true, mobile_phone: '+15550000004', consent_status: 'pending', is_active: true },
+  ]);
+  const out = JSON.parse((await fn.handler(req({ send_email: true }))).body);
+  assert.equal(out.emailed, 1);
+  assert.equal(out.no_email, 2);
+  assert.equal(out.email_failed, 0);
+  assert.equal(mail.sent.length, 1);
+  assert.equal(mail.sent[0].to, 's@x.com');
+  assert.match(mail.sent[0].subject, /Acme Hospital/);
+  const link = mail.sent[0].body.match(/https:\/\/x\.netlify\.app\/enroll\/[A-Za-z0-9_-]{43}/)[0];
+  assert.ok(link);
+  assert.equal(out.invites.some((i) => i.link === link), false, 'emailed link is not returned to the sender');
+  assert.equal(out.invites.length, 2, 'people who could not be emailed still get a link to deliver by hand');
+  setEmailProviderForTests(null);
+});
+
+test('a failed email send keeps the link for hand delivery', async () => {
+  const fn = loadFunction('create-invites');
+  setEmailProviderForTests(createMockEmailProvider({ failAddresses: { 's@x.com': 'invalid_email' } }));
+  setup(op('admin'), null, [people[0]]);
+  const out = JSON.parse((await fn.handler(req({ send_email: true }))).body);
+  assert.equal(out.emailed, 0);
+  assert.equal(out.email_failed, 1);
+  assert.equal(out.invites.length, 1);
+  setEmailProviderForTests(null);
 });

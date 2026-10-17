@@ -82,12 +82,29 @@ export default function PeoplePage() {
     setBusy(false);
   };
 
+  const emailInvites = async () => {
+    const targets = rows.filter((p) => p.is_active && p.consent_status !== 'consented' && p.email);
+    if (targets.length === 0) { setMsg('No one shown needs an invite and has an email address.'); return; }
+    if (!window.confirm(`Email an enrollment link to ${targets.length} people? Any unused link they already have is replaced. Nobody is texted.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      let emailed = 0, failed = 0, leftover = 0;
+      for (let i = 0; i < targets.length; i += 200) {
+        const r = await callFunction<{ emailed: number; email_failed: number; invites: unknown[] }>('create-invites', { person_ids: targets.slice(i, i + 200).map((p) => p.id), send_email: true });
+        emailed += r.emailed; failed += r.email_failed; leftover += r.invites.length;
+      }
+      setMsg(`Emailed ${emailed} links.${failed ? ` ${failed} could not be sent.` : ''}${leftover ? ` ${leftover} links were created but not emailed; use "Download invite links" to deliver those by hand.` : ''}`);
+    } catch (e) { setMsg((e as Error).message); }
+    setBusy(false);
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1>People</h1>
         {canEdit && (
           <div style={{ display: 'flex', gap: 10 }}>
+            <button disabled={busy} onClick={emailInvites} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>Email invite links</button>
             <button disabled={busy} onClick={downloadInvites} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>{busy ? 'Working…' : 'Download invite links'}</button>
             <button onClick={() => navigate('/people/import')} style={{ ...control, background: 'white', cursor: 'pointer', fontWeight: 600 }}>Import CSV</button>
             <button className="btn-primary" onClick={() => navigate('/people/new')}>+ Add person</button>
