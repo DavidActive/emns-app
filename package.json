@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "node --test \"tests/*.test.cjs\"",
-    "check:ids": "node scripts/check-no-live-ids.cjs"
+    "check:ids": "node scripts/check-no-live-ids.cjs",
+    "load-test": "node scripts/load-test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
