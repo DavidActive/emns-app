@@ -45,6 +45,7 @@ export default function PersonEditPage() {
   const [linkMsg, setLinkMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    setLink(null); setLinkMsg(null); // never carry one person's link over to another person's page
     if (isNew) return;
     supabase
       .from('people')
