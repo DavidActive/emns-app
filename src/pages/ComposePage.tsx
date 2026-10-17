@@ -7,16 +7,18 @@ import { canDrill, canSendAlert } from '../lib/permissions';
 import { formatMessage } from '../lib/messageFormat.mjs';
 import { formatEmail } from '../lib/emailFormat.mjs';
 import { formatVoice } from '../lib/voiceFormat.mjs';
+import { formatDesktop } from '../lib/desktopFormat.mjs';
 
 type Kind = 'alert' | 'drill' | 'test';
-type Channel = 'sms' | 'email' | 'voice';
+type Channel = 'sms' | 'email' | 'voice' | 'desktop';
 type Mode = 'together' | 'fallback';
 interface Scenario { id: string; name: string; kind: Kind; bodies: { sms?: string }; default_group_ids: string[]; requires_ack: boolean }
 interface Group { id: string; name: string }
 interface Audience { total: number; will_receive: number; opted_out: number; no_consent: number }
+interface DesktopAudience { total: number; will_receive: number; online: number; no_agent: number }
 interface EmailAudience { total: number; will_receive: number; no_email: number; opted_out: number; bounced: number }
-const NAME: Record<Channel, string> = { sms: 'Text message', email: 'Email', voice: 'Phone call' };
-const VERB: Record<Channel, string> = { sms: 'text', email: 'email', voice: 'call' };
+const NAME: Record<Channel, string> = { sms: 'Text message', email: 'Email', voice: 'Phone call', desktop: 'Desktop alert' };
+const VERB: Record<Channel, string> = { sms: 'text', email: 'email', voice: 'call', desktop: 'alert on the computer of' };
 
 export default function ComposePage() {
   const { staff } = useAuth();
@@ -34,6 +36,7 @@ export default function ComposePage() {
   const [audience, setAudience] = useState<Audience | null>(null);
   const [emailAudience, setEmailAudience] = useState<EmailAudience | null>(null);
   const [voiceAudience, setVoiceAudience] = useState<Audience | null>(null);
+  const [desktopAudience, setDesktopAudience] = useState<DesktopAudience | null>(null);
   const [order, setOrder] = useState<Channel[]>(['sms']); // the order boxes were ticked: it is the order used in "in this order" mode
   const [mode, setMode] = useState<Mode>('together');
   const [fallbackMinutes, setFallbackMinutes] = useState(0); // 0 = move on only when a channel fails
@@ -74,6 +77,7 @@ export default function ComposePage() {
   const usesSms = order.includes('sms');
   const usesEmail = order.includes('email');
   const usesVoice = order.includes('voice');
+  const usesDesktop = order.includes('desktop');
   const effectiveMode: Mode = order.length > 1 ? mode : 'together';
 
   useEffect(() => {
@@ -88,6 +92,11 @@ export default function ComposePage() {
     if (selected.length === 0 || !usesVoice) { setVoiceAudience(null); return; }
     supabase.rpc('preview_voice_audience', { p_group_ids: selected }).then(({ data }) => setVoiceAudience((data ?? null) as Audience | null));
   }, [selected, usesVoice]);
+
+  useEffect(() => {
+    if (selected.length === 0 || !usesDesktop) { setDesktopAudience(null); return; }
+    supabase.rpc('preview_desktop_audience', { p_group_ids: selected }).then(({ data }) => setDesktopAudience((data ?? null) as DesktopAudience | null));
+  }, [selected, usesDesktop]);
 
   const emailPreview = useMemo(() => {
     try {
@@ -108,6 +117,10 @@ export default function ComposePage() {
     } catch { return ''; }
   }, [kind, body, ack, org]);
 
+  const desktopPreview = useMemo(() => {
+    try { return formatDesktop({ kind, orgName: org?.name ?? '', body }); } catch { return ''; }
+  }, [kind, body, org]);
+
   if (!canDrill(staff)) return <div><h1>Send</h1><p>Your role can view notifications but not send them.</p></div>;
 
   const toggle = (c: Channel, on: boolean) => setOrder((o) => (on ? (o.includes(c) ? o : [...o, c]) : o.filter((x) => x !== c)));
@@ -115,6 +128,7 @@ export default function ComposePage() {
     sms: usesSms ? audience?.will_receive ?? 0 : 0,
     email: usesEmail ? emailAudience?.will_receive ?? 0 : 0,
     voice: usesVoice ? voiceAudience?.will_receive ?? 0 : 0,
+    desktop: usesDesktop ? desktopAudience?.will_receive ?? 0 : 0,
   };
   const ready = selected.length > 0 && order.length > 0 && (kind !== 'alert' || body.trim().length > 0) && order.some((c) => people[c] > 0);
   const send = async () => {
@@ -160,7 +174,7 @@ export default function ComposePage() {
 
         <fieldset style={{ border: '1px solid var(--brand-gray-300)', borderRadius: 6 }}>
           <legend>How to reach people</legend>
-          {(['sms', 'email', 'voice'] as Channel[]).map((c) => (
+          {(['sms', 'email', 'voice', 'desktop'] as Channel[]).map((c) => (
             <label key={c} style={{ display: 'inline-block', marginRight: 18 }}>
               <input type="checkbox" checked={order.includes(c)} onChange={(e) => toggle(c, e.target.checked)} /> {NAME[c]}
             </label>
@@ -197,7 +211,7 @@ export default function ComposePage() {
             <div style={{ ...note, alignSelf: 'end' }}>A busy line or no answer is tried again, up to this many calls. A voicemail greeting counts as reached.</div>
           </div>
         )}
-        <label><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> Ask people to confirm they are safe{usesSms || usesEmail ? ' (reply SAFE' : ''}{usesVoice ? `${usesSms || usesEmail ? ', or ' : ' ('}press 1 on a call` : ''}{usesSms || usesEmail || usesVoice ? ')' : ''}</label>
+        <label><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /> Ask people to confirm they are safe{usesSms || usesEmail ? ' (reply SAFE' : ''}{usesVoice ? `${usesSms || usesEmail ? ', or ' : ' ('}press 1 on a call` : ''}{usesDesktop ? `${usesSms || usesEmail || usesVoice ? ', or ' : ' ('}click "I'm safe" on the desktop alert` : ''}{usesSms || usesEmail || usesVoice || usesDesktop ? ')' : ''}</label>
         <fieldset style={{ border: '1px solid var(--brand-gray-300)', borderRadius: 6 }}>
           <legend>Send to</legend>
           {groups.length === 0 && <span>No groups yet. Create groups first.</span>}
@@ -225,6 +239,10 @@ export default function ComposePage() {
               {voiceAudience.no_consent > 0 && <div>{voiceAudience.no_consent} skipped for calls: have not agreed to contact yet.</div>}
               {voiceAudience.opted_out > 0 && <div>{voiceAudience.opted_out} skipped for calls: asked to stop calls.</div>}
             </>}
+            {usesDesktop && desktopAudience && <>
+              <div><strong>{desktopAudience.will_receive}</strong> of {desktopAudience.total} people have a computer paired for desktop alerts ({desktopAudience.online} online right now).</div>
+              {desktopAudience.no_agent > 0 && <div>{desktopAudience.no_agent} skipped for desktop: no computer paired yet.</div>}
+            </>}
             {effectiveMode === 'fallback' && <div style={{ fontSize: 13 }}>Each later channel is held and only goes to people whose earlier one fails. People with no usable first channel move on right away.</div>}
           </div>
         )}
@@ -247,6 +265,12 @@ export default function ComposePage() {
             <div style={box}>{voicePreview || '—'}</div>
           </div>
         )}
+        {usesDesktop && (
+          <div>
+            <div style={note}>Desktop alert on the computer will show</div>
+            <div style={box}>{desktopPreview || '—'}</div>
+          </div>
+        )}
         {error && <p role="alert" style={{ color: 'var(--tier-3)' }}>{error}</p>}
         <button className="btn-primary" disabled={!ready} onClick={() => { setConfirmAlert(false); setConfirming(true); }} style={{ opacity: ready ? 1 : 0.5 }}>Review and send</button>
       </div>
@@ -261,6 +285,7 @@ export default function ComposePage() {
             {usesSms && <div style={box}>{preview}</div>}
             {usesEmail && emailPreview && <div style={{ ...box, marginTop: 8 }}><strong>{emailPreview.subject}</strong></div>}
             {usesVoice && <div style={{ ...box, marginTop: 8 }}>{voicePreview}</div>}
+            {usesDesktop && <div style={{ ...box, marginTop: 8 }}>{desktopPreview}</div>}
             {kind === 'alert' && (
               <label style={{ display: 'block', margin: '12px 0' }}>
                 <input type="checkbox" checked={confirmAlert} onChange={(e) => setConfirmAlert(e.target.checked)} /> This is a real emergency and I want to alert these people now.

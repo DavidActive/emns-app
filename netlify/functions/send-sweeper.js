@@ -15,11 +15,16 @@ exports.handler = async () => {
   const esc = await db.rpc('escalate_unacknowledged');
   if (esc.error) console.error('escalate_unacknowledged failed', esc.error.message);
   const escalated = esc.data || 0;
+  // Desktop alerts are collected by the desktop agent, not sent by the worker. One nobody picked up in time becomes "undelivered"
+  // so the person's next channel can go out (a computer that reconnects later still receives it).
+  const exp = await db.rpc('expire_desktop_deliveries', { p_ttl_seconds: Math.max(10, Number(env.EMNS_DESKTOP_WAIT_SECONDS) || 120) });
+  if (exp.error) console.error('expire_desktop_deliveries failed', exp.error.message);
   const nowIso = new Date().toISOString();
   const staleIso = new Date(Date.now() - LEASE_SECONDS * 1000).toISOString();
   const { count, error } = await db
     .from('notification_deliveries')
     .select('id', { count: 'exact', head: true })
+    .neq('channel', 'desktop')
     .or(`and(status.eq.queued,next_attempt_at.lte.${nowIso}),and(status.eq.sending,locked_at.lt.${staleIso})`);
   if (error) { console.error('send-sweeper query failed', error.message); return { statusCode: 500, body: error.message }; }
   if (!count && !escalated) return { statusCode: 200, body: 'idle' };

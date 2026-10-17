@@ -1,0 +1,6 @@
+{
+  "serverUrl": "https://emns.example.org",
+  "takeover": "window",
+  "allowQuit": false,
+  "sound": true
+}

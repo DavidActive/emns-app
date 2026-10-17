@@ -5,3 +5,5 @@ dist
 .netlify
 tsconfig.tsbuildinfo
 .env.docker
+agent/node_modules
+agent/dist

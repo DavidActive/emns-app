@@ -3,6 +3,7 @@ import { useAuth } from '../lib/AuthContext';
 import { callFunction } from '../lib/api';
 
 interface Me { full_name: string | null; mobile_phone: string; email: string | null; consent_status: string }
+interface Device { id: string; device_name: string; platform: string; enrolled_at: string; last_seen_at: string | null }
 interface Res { organization: string | null; person: Me; changed?: string[]; consent_reset?: boolean }
 
 // Employee self-service: your own mobile number and email, nothing else.
@@ -15,11 +16,27 @@ export default function MyContactPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [code, setCode] = useState<{ value: string; minutes: number } | null>(null);
+  const [agentMsg, setAgentMsg] = useState<string | null>(null);
 
   const apply = (r: Res) => { setMe(r.person); setMobile(r.person.mobile_phone); setEmail(r.person.email ?? ''); };
   useEffect(() => {
     callFunction<Res>('my-contact', { action: 'get' }).then((r) => { setOrg(r.organization); apply(r); }).catch((e) => setError((e as Error).message));
   }, []);
+
+  const loadDevices = () => callFunction<{ devices: Device[] }>('agent-pair', { action: 'list' }).then((r) => setDevices(r.devices)).catch(() => setDevices([]));
+  useEffect(() => { loadDevices(); }, []);
+  const makeCode = async () => {
+    setAgentMsg(null);
+    try { const r = await callFunction<{ code: string; expires_in_seconds: number }>('agent-pair', { action: 'create_code' }); setCode({ value: r.code, minutes: Math.round(r.expires_in_seconds / 60) }); }
+    catch (err) { setAgentMsg((err as Error).message); }
+  };
+  const removeDevice = async (id: string) => {
+    setAgentMsg(null);
+    try { await callFunction('agent-pair', { action: 'revoke', device_id: id }); await loadDevices(); setAgentMsg('That computer will no longer receive alerts.'); }
+    catch (err) { setAgentMsg((err as Error).message); }
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError(null); setMsg(null);
@@ -51,6 +68,33 @@ export default function MyContactPage() {
             {msg && <p role="status" style={{ color: 'var(--tier-1)' }}>{msg}</p>}
             <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
           </form>
+        )}
+        {me && (
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--brand-gray-300)' }}>
+            <h2 style={{ fontSize: 16, margin: '0 0 6px' }}>Desktop alerts</h2>
+            <p style={{ fontSize: 13, color: 'var(--brand-gray-600)', marginTop: 0 }}>
+              Install the Active SOS eMNS desktop app on your work computer (your IT team can deploy it), open it, and enter a pairing code from here. Alerts then appear on that computer even if no browser is open.
+            </p>
+            {code && (
+              <div role="status" style={{ textAlign: 'center', margin: '8px 0 12px' }}>
+                <div style={{ fontSize: 28, letterSpacing: 3, fontWeight: 700, fontFamily: 'monospace' }}>{code.value}</div>
+                <div style={{ fontSize: 12, color: 'var(--brand-gray-600)' }}>Enter this in the desktop app within {code.minutes} minutes. It works once.</div>
+                <div style={{ fontSize: 12, color: 'var(--brand-gray-600)' }}>Server address: <strong>{window.location.origin}</strong></div>
+              </div>
+            )}
+            <button type="button" onClick={makeCode} style={{ width: '100%' }}>{code ? 'Get a new code' : 'Get a pairing code'}</button>
+            {devices.length > 0 && (
+              <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0' }}>
+                {devices.map((d) => (
+                  <li key={d.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 14 }}>
+                    <span><strong>{d.device_name}</strong><br /><span style={{ fontSize: 12, color: 'var(--brand-gray-600)' }}>{d.last_seen_at ? `Last seen ${new Date(d.last_seen_at).toLocaleString()}` : 'Not seen yet'}</span></span>
+                    <button type="button" onClick={() => removeDevice(d.id)}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {agentMsg && <p role="status" style={{ fontSize: 13 }}>{agentMsg}</p>}
+          </div>
         )}
         <button onClick={signOut} style={{ width: '100%', marginTop: 10 }}>Sign out</button>
       </div>

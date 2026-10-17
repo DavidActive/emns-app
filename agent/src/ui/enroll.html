@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pair this computer</title>
+<link rel="stylesheet" href="enroll.css">
+</head>
+<body>
+<main>
+  <h1>Pair this computer</h1>
+  <p>Sign in to Active SOS eMNS in your browser, open <strong>My contact details</strong>, choose <strong>Get a pairing code</strong>, and type the code here.</p>
+  <form id="form">
+    <label id="serverRow">Server address
+      <input id="server" type="url" inputmode="url" autocomplete="off" placeholder="https://emns.example.org">
+    </label>
+    <label>Pairing code
+      <input id="code" type="text" autocomplete="off" spellcheck="false" maxlength="12" placeholder="ABCD-2345" autofocus>
+    </label>
+    <button id="go" type="submit">Pair this computer</button>
+  </form>
+  <p id="msg" role="status" aria-live="polite"></p>
+</main>
+<script src="enroll.js"></script>
+</body>
+</html>

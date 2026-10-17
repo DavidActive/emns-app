@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; media-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active SOS eMNS alert</title>
+<link rel="stylesheet" href="alert.css">
+</head>
+<body>
+<main id="card" class="kind-alert" role="alertdialog" aria-labelledby="banner" aria-describedby="message">
+  <div id="banner" class="banner">EMERGENCY ALERT</div>
+  <div id="org" class="org"></div>
+  <p id="message" class="message"></p>
+  <div id="meta" class="meta"></div>
+  <div id="buttons" class="buttons">
+    <button id="safe" type="button" class="btn safe">I'm safe</button>
+    <button id="help" type="button" class="btn help">I need help</button>
+    <button id="ok" type="button" class="btn ok" hidden>OK, got it</button>
+  </div>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+  <div id="more" class="more"></div>
+</main>
+<script src="alert.js"></script>
+</body>
+</html>

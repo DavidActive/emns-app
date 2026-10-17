@@ -8,7 +8,7 @@
 // ROLES (P6): viewers cannot send. Operators may send drills and tests only. Real alerts need sender or admin (or platform admin).
 //
 // Request:  POST { kind: 'alert'|'drill'|'test', body?, group_ids?: [uuid], scenario_id?: uuid, requires_ack?: boolean, idempotency_key?: string,
-//                  channels?: ['sms'|'email'|'voice', ...] (default ['sms']; order matters in fallback mode),
+//                  channels?: ['sms'|'email'|'voice'|'desktop', ...] (default ['sms']; order matters in fallback mode),
 //                  fallback_after_seconds?: 0-86400 (fallback mode only; 0 = move to the next channel only when one fails; N = also move on if the person has not acknowledged within N seconds),
 //                  mode?: 'together'|'fallback' (default 'together'; fallback sends the first usable channel and the next one only if it fails),
 //                  email_subject?: string,
@@ -26,6 +26,7 @@ const { internalBaseUrl, functionUrl } = require('../../src/server/runtime.cjs')
 const { formatMessage } = require('../../src/server/broadcast/messageFormat.cjs');
 const { formatEmail } = require('../../src/server/broadcast/emailFormat.cjs');
 const { formatVoice } = require('../../src/server/broadcast/voiceFormat.cjs');
+const { formatDesktop } = require('../../src/server/broadcast/desktopFormat.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
 const ALERT_ROLES = ['admin', 'sender'];
@@ -34,7 +35,7 @@ const MAX_BODY = 1600;
 const MAX_GROUPS = 50;
 const KINDS = ['alert', 'drill', 'test'];
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const CHANNELS = ['sms', 'email', 'voice'];
+const CHANNELS = ['sms', 'email', 'voice', 'desktop'];
 const clampInt = (v, lo, hi, dflt) => { if (v === null || v === undefined || v === '' || typeof v === 'boolean') return dflt; const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : dflt; };
 const MODES = ['together', 'fallback'];
 
@@ -88,7 +89,7 @@ exports.handler = async (event) => {
   // Channels: validated here, and again inside the database function.
   const channels = payload.channels === undefined ? ['sms'] : payload.channels;
   if (!Array.isArray(channels) || channels.length === 0 || !channels.every((c) => CHANNELS.includes(c)) || new Set(channels).size !== channels.length) {
-    return json(400, { error: 'channels must be a list of sms, email and/or voice, each at most once.' });
+    return json(400, { error: 'channels must be a list of sms, email, voice and/or desktop, each at most once.' });
   }
   const mode = payload.mode === undefined ? 'together' : payload.mode;
   if (!MODES.includes(mode)) return json(400, { error: 'mode must be together or fallback.' });
@@ -114,6 +115,13 @@ exports.handler = async (event) => {
     const spokenRaw = (typeof payload.voice_text === 'string' && payload.voice_text.trim()) || ownBody || scenarioVoice || rawBody;
     voice = formatVoice({ kind, orgName: org && org.name, body: spokenRaw });
     if (voice.length > 1000) return json(400, { error: 'The spoken message is too long (max 1000 characters including the standard wording).' });
+  }
+  // The desktop alert text is built here too (brand, organization, DRILL/TEST wording). The agent shows it with "I'm safe" / "I need help" buttons.
+  let desktop = null;
+  if (channels.includes('desktop')) {
+    const scenarioDesktop = scenario && scenario.bodies && typeof scenario.bodies.desktop === 'string' ? scenario.bodies.desktop.trim() : '';
+    desktop = formatDesktop({ kind, orgName: org && org.name, body: ownBody || scenarioDesktop || rawBody });
+    if (desktop.length > 1000) return json(400, { error: 'The desktop alert is too long (max 1000 characters including the standard wording).' });
   }
   const voiceAttempts = clampInt(payload.voice_max_attempts, 1, 5, 2);
   const voiceRetrySeconds = clampInt(payload.voice_retry_seconds, 30, 3600, 120);
@@ -141,10 +149,11 @@ exports.handler = async (event) => {
     p_voice_text: voice,
     p_voice_max_attempts: voiceAttempts,
     p_voice_retry_seconds: voiceRetrySeconds,
+    p_desktop_text: desktop,
   });
   if (error) {
     const msg = error.message || 'Could not create the notification.';
-    return json(/group|body|kind|channel|mode|subject|voice/i.test(msg) ? 400 : 500, { error: msg });
+    return json(/group|body|kind|channel|mode|subject|voice|desktop/i.test(msg) ? 400 : 500, { error: msg });
   }
 
   if (!data.deduplicated && fallbackAfter > 0) {

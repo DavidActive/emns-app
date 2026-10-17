@@ -1,0 +1,31 @@
+{
+  "name": "emns-desktop-agent",
+  "productName": "Active SOS eMNS",
+  "version": "0.1.0",
+  "description": "Desktop alert agent for Active SOS eMNS: shows emergency alerts on a work computer.",
+  "private": true,
+  "author": "Active SOS, LLC",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test ../tests/desktopAgent.test.cjs",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.activesos.emns.agent",
+    "productName": "Active SOS eMNS",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "package.json"],
+    "extraResources": [{ "from": "config.example.json", "to": "config.json" }],
+    "win": {
+      "target": ["nsis", "msi"],
+      "artifactName": "ActiveSOS-eMNS-Agent-${version}-${arch}.${ext}"
+    },
+    "nsis": { "oneClick": false, "perMachine": true, "allowToChangeInstallationDirectory": false, "runAfterFinish": true },
+    "msi": { "oneClick": false, "perMachine": true }
+  }
+}
