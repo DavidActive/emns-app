@@ -86,7 +86,7 @@ test('drills and tests always carry the tag, and the tag is configurable per org
   db = setup(operator('operator'), { org: { name: 'Acme', settings: { drill_tag: 'exercise', test_tag: 'check' } } });
   await fn.handler(req({ kind: 'drill', body: '', group_ids: [G1] }));
   await fn.handler(req({ kind: 'test', body: '', group_ids: [G1] }));
-  const bodies = db.calls.filter((c) => c.rpc).map((c) => c.args.p_body);
+  const bodies = db.calls.filter((c) => c.rpc === 'create_notification_event').map((c) => c.args.p_body);
   assert.ok(bodies[0].includes('[EXERCISE]'));
   assert.ok(bodies[1].includes('[CHECK]'));
 

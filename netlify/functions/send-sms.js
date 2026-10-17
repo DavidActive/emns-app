@@ -19,6 +19,7 @@ const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
 const { getMessageProvider } = require('../../src/server/providers/index.cjs');
+const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
 
 const SENDER_ROLES = ['admin', 'sender', 'operator'];
 const MAX_BODY = 1600; // Twilio's hard limit per message
@@ -41,6 +42,8 @@ exports.handler = async (event) => {
     .eq('user_id', callerAuth.user.id)
     .maybeSingle();
   if (!caller) return json(403, { error: 'No staff profile for this account.' });
+  const rl = await rateLimit(supabase, `send-sms:${caller.id}`, 60, 60);
+  if (!rl.ok) return tooMany(rl);
 
   // --- input ---
   let payload;

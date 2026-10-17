@@ -68,6 +68,8 @@ export default function PeoplePage() {
     if (!window.confirm(`Create one-time enrollment links for ${targets.length} people? Any unused link they already have is replaced. The file you download contains private links: send each person only their own.`)) return;
     setBusy(true); setMsg(null);
     try {
+      const { error: logError } = await supabase.rpc('log_export', { p_kind: 'enrollment_links_csv', p_rows: targets.length });
+      if (logError) throw new Error('Could not record this export, so nothing was created: ' + logError.message);
       const all: { full_name: string; email: string | null; mobile_phone: string; link: string }[] = [];
       for (let i = 0; i < targets.length; i += 1000) {
         const r = await callFunction<{ invites: typeof all }>('create-invites', { person_ids: targets.slice(i, i + 1000).map((p) => p.id) });

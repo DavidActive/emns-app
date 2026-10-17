@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { getMessageProvider } = require('../../src/server/providers/index.cjs');
 const { TEXT_VERSION, LINKS, consentText, confirmationMessage } = require('../../src/server/consent/consentText.cjs');
+const { rateLimit, tooMany, clientIp } = require('../../src/server/rateLimit.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{32,64}$/;
@@ -20,6 +21,8 @@ exports.handler = async (event) => {
   const method = event.httpMethod;
   if (method !== 'GET' && method !== 'POST') return json(405, { error: 'Method not allowed' });
 
+  const rl = await rateLimit(supabase, `enroll:${clientIp(event)}`, method === 'POST' ? 10 : 60, 60);
+  if (!rl.ok) return tooMany(rl);
   let token = '';
   if (method === 'GET') token = (event.queryStringParameters || {}).token || '';
   else { try { token = JSON.parse(event.body || '{}').token || ''; } catch { return json(400, { error: 'Invalid JSON.' }); } }

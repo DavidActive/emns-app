@@ -11,6 +11,7 @@
 // new user; the flag is never taken from the request body for that reason.
 
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
+const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
 
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
 
@@ -39,6 +40,9 @@ exports.handler = async (event) => {
   if (callerStaffError || !callerStaff?.is_platform_admin) {
     return { statusCode: 403, body: JSON.stringify({ error: 'Only a global admin can invite new users.' }) };
   }
+
+  const rl = await rateLimit(supabase, `invite-staff:${callerAuth.user.id}`, 10, 60);
+  if (!rl.ok) return tooMany(rl);
 
   const { email, full_name, organization_id, role, is_platform_admin } = JSON.parse(event.body || '{}');
   if (!email || !organization_id) {

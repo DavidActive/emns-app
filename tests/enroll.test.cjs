@@ -38,7 +38,7 @@ test('GET: malformed links never reach the database; a valid link shows the orga
   const fn = loadFunction('enroll');
   const { db } = setup();
   assert.deepEqual(JSON.parse((await fn.handler(get('short'))).body), { status: 'invalid' });
-  assert.equal(db.calls.length, 0);
+  assert.equal(db.calls.filter((c) => c.rpc !== 'check_rate_limit').length, 0);
 
   const r = JSON.parse((await fn.handler(get(token))).body);
   assert.equal(r.status, 'valid');
@@ -46,7 +46,7 @@ test('GET: malformed links never reach the database; a valid link shows the orga
   assert.equal(r.consent_text, consentText('Acme Hospital'));
   assert.equal(r.text_version, TEXT_VERSION);
   assert.equal(JSON.stringify(r).includes('5550004242'), false);
-  assert.equal(db.calls[0].args.p_token_hash, sha(token), 'only the hash is sent to the database');
+  assert.equal(db.calls.find((c) => c.rpc === 'get_enrollment_invite').args.p_token_hash, sha(token), 'only the hash is sent to the database');
   assert.equal(JSON.stringify(db.calls).includes(token), false, 'the plaintext token is never passed on');
 
   for (const status of ['used', 'expired', 'invalid']) {

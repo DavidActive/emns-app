@@ -21,6 +21,7 @@
 
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
+const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
 const { formatMessage } = require('../../src/server/broadcast/messageFormat.cjs');
 const { formatEmail } = require('../../src/server/broadcast/emailFormat.cjs');
 const { formatVoice } = require('../../src/server/broadcast/voiceFormat.cjs');
@@ -55,6 +56,8 @@ exports.handler = async (event) => {
   const auth = await requireOperator(event, supabase, DRILL_ROLES);
   if (auth.error) return auth.error;
   const caller = auth.operator;
+  const rl = await rateLimit(supabase, `send-event:${caller.id}`, 20, 60);
+  if (!rl.ok) return tooMany(rl);
 
   let payload;
   try { payload = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid JSON.' }); }

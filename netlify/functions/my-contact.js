@@ -5,6 +5,7 @@
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { getAuthProvider } = require('../../src/server/auth/authProvider.cjs');
 const { normalizePhone } = require('../../src/server/phone.cjs');
+const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
 
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -17,6 +18,8 @@ exports.handler = async (event) => {
   const auth = await getAuthProvider(db).verify(token);
   if (!auth.ok) return json(401, { error: 'Invalid or expired session.' });
 
+  const rl = await rateLimit(db, `my-contact:${auth.identity.key}`, 30, 600);
+  if (!rl.ok) return tooMany(rl);
   const column = auth.identity.provider === 'oidc' ? 'idp_subject' : 'user_id';
   const { data: person } = await db.from('people')
     .select('id, organization_id, full_name, mobile_phone, email, consent_status, is_active')

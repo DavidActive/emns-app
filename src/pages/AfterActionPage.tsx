@@ -24,7 +24,9 @@ export default function AfterActionPage() {
   const off = (v: string | null) => (v ? `+${formatDuration(Math.max(0, (new Date(v).getTime() - base) / 1000))}` : '');
   const unaccounted = r.people.filter((p: any) => p.status === 'unaccounted');
 
-  function download() {
+  async function download() {
+    const { error: logError } = await supabase.rpc('log_export', { p_kind: 'after_action_csv', p_rows: r.people.length, p_ref: r.event.id });
+    if (logError) { alert('Could not record this export, so it was not downloaded: ' + logError.message); return; }
     const blob = new Blob(['﻿' + buildCsv(r)], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);

@@ -5,6 +5,7 @@
 // Only org admins. The person must belong to the caller's organization.
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
+const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 exports.handler = async (event) => {
@@ -12,6 +13,8 @@ exports.handler = async (event) => {
   const db = getDb();
   const { operator, error } = await requireOperator(event, db, ['admin']);
   if (error) return error;
+  const rl = await rateLimit(db, `link-employee:${operator.id}`, 20, 60);
+  if (!rl.ok) return tooMany(rl);
   let p; try { p = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid request.' }); }
   if (typeof p.person_id !== 'string' || !UUID_RE.test(p.person_id)) return json(400, { error: 'Invalid person id.' });
   const { data: person } = await db.from('people').select('id, email, full_name')

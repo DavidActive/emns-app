@@ -7,6 +7,7 @@
 const crypto = require('crypto');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { requireOperator, json } = require('../../src/server/auth/requireOperator.cjs');
+const { rateLimit, tooMany } = require('../../src/server/rateLimit.cjs');
 const { getEmailProvider } = require('../../src/server/providers/index.cjs');
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] });
 
@@ -48,6 +49,8 @@ exports.handler = async (event) => {
   const auth = await requireOperator(event, supabase, ROLES);
   if (auth.error) return auth.error;
   const operator = auth.operator;
+  const rl = await rateLimit(supabase, `create-invites:${operator.id}`, 30, 60);
+  if (!rl.ok) return tooMany(rl);
 
   let payload;
   try { payload = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid JSON.' }); }
