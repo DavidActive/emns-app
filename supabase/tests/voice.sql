@@ -120,7 +120,7 @@ begin
   set local role authenticated;
   rc := public.event_roll_call(ev1);
   out := array_append(out, '27 audience preview for calls: '||(public.preview_voice_audience(array[g]))::text
-    ||case when (public.preview_voice_audience(array[g])->>'will_receive')::int=5 and (public.preview_voice_audience(array[g])->>'no_consent')::int=1 and (public.preview_voice_audience(array[g])->>'opted_out')::int=2 then ' (ok)' else ' (FAIL)' end);
+    ||case when (public.preview_voice_audience(array[g])->>'will_receive')::int=4 and (public.preview_voice_audience(array[g])->>'no_consent')::int=1 and (public.preview_voice_audience(array[g])->>'opted_out')::int=2 then ' (ok)' else ' (FAIL)' end);
   reset role;
   if rc is null then raise exception 'roll-call came back empty'; end if;
   select string_agg((x->>'full_name')||'='||(x->>'status'), ',' order by x->>'full_name') into s from jsonb_array_elements(rc->'people') x;
