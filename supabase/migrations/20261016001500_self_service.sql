@@ -35,8 +35,8 @@ begin
   v_email  := case when p_email is null then p.email else nullif(btrim(p_email), '') end;
   if v_mobile !~ '^\+[1-9][0-9]{7,14}$' then raise exception 'invalid mobile number'; end if;
   if v_email is not null and v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'invalid email address'; end if;
-  if v_mobile is distinct from p.mobile_phone then v_changed := v_changed || 'mobile_phone'; end if;
-  if v_email is distinct from p.email then v_changed := v_changed || 'email'; end if;
+  if v_mobile is distinct from p.mobile_phone then v_changed := array_append(v_changed, 'mobile_phone'::text); end if;
+  if v_email is distinct from p.email then v_changed := array_append(v_changed, 'email'::text); end if;
   if cardinality(v_changed) = 0 then return jsonb_build_object('changed', '[]'::jsonb, 'consent_reset', false); end if;
   v_consent_reset := 'mobile_phone' = any(v_changed) and p.consent_status = 'consented';
   begin
