@@ -79,3 +79,29 @@ test('a failure recording the acknowledgement does not lose the message', async 
   assert.equal((await fn.handler(inbound('SAFE'))).statusCode, 200);
   assert.ok(db.calls.some((c) => c.table === 'inbox_items' && c.op === 'insert'));
 });
+
+test('free text that reads as an emergency counts as SOS in the roll-call and is a critical item', async () => {
+  const db = setup(MATCH);
+  const fn = loadFunction('sms-webhook');
+  await fn.handler(inbound('There is a shooter in the east lot'));
+  assert.equal(ackCall(db).args.p_response, 'SOS');
+  const items = db.calls.filter((c) => c.table === 'inbox_items' && (c.op === 'insert' || c.op === 'update'));
+  assert.ok(items.length > 0);
+  assert.equal(items[0].payload.tier, 3);
+});
+
+test('"I am not safe" with no open event is still a critical item, not routine', async () => {
+  const db = setup({ matched: false });
+  const fn = loadFunction('sms-webhook');
+  await fn.handler(inbound('I am not safe'));
+  const items = db.calls.filter((c) => c.table === 'inbox_items' && (c.op === 'insert' || c.op === 'update'));
+  assert.ok(items.length > 0);
+  assert.equal(items[0].payload.tier, 3);
+});
+
+test('ordinary free text stays a normal item and is recorded as TEXT', async () => {
+  const db = setup(MATCH);
+  const fn = loadFunction('sms-webhook');
+  await fn.handler(inbound('Running late, will check in at noon'));
+  assert.equal(ackCall(db).args.p_response, 'TEXT');
+});

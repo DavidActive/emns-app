@@ -7,6 +7,7 @@
 const { checkTwilioSignature, baseUrl } = require('../../src/server/providers/twilioSignature.cjs');
 const { getDb } = require('../../src/server/providers/dataStore.cjs');
 const { classifyReply } = require('../../src/server/replies/classifyReply.cjs');
+const { matchKeywordTier, DEFAULT_TIER_RULES } = require('../../src/server/replies/triage.cjs');
 
 
 const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests can inject a fake DataStore
@@ -15,17 +16,7 @@ const supabase = new Proxy({}, { get: (_t, k) => getDb()[k] }); // lazy so tests
 // brand-new org that hasn't configured its own crisis/safe keywords yet). Organizations
 // normally define and edit their own list from Org Settings -> Crisis Keywords, which is
 // backed by the priority_rules table.
-const DEFAULT_TIER_RULES = [
-  { keyword: 'suicide', tier: 3 },
-  { keyword: 'kill myself', tier: 3 },
-  { keyword: 'end it', tier: 3 },
-  { keyword: 'help me now', tier: 3 },
-  { keyword: 'safe', tier: 1 },
-  { keyword: "i'm ok", tier: 1 },
-  { keyword: 'im ok', tier: 1 },
-  { keyword: 'checking in', tier: 1 },
-];
-
+// Default rules and the matcher live in one shared, tested module (whole words only, negated reassurance is critical).
 async function getTierRules(organizationId) {
   const { data, error } = await supabase
     .from('priority_rules')
@@ -36,22 +27,6 @@ async function getTierRules(organizationId) {
     return DEFAULT_TIER_RULES;
   }
   return data && data.length > 0 ? data : DEFAULT_TIER_RULES;
-}
-
-// Single source of truth for turning message text into a tier, shared by both the freeform
-// path and the structured Active SOS App alert path (see classify() below) — this is the
-// "logic stream" that makes a concept like "relapse" classify the same way no matter which
-// channel it arrives through, as long as an org has a rule for it. Longest/highest-tier match
-// wins if multiple keywords are present.
-function matchKeywordTier(text, rules) {
-  const lower = (text || '').toLowerCase();
-  let best = null;
-  for (const rule of rules) {
-    if (lower.includes(rule.keyword.toLowerCase())) {
-      if (!best || rule.tier > best.tier) best = rule;
-    }
-  }
-  return best;
 }
 
 // Structured alerts sent by the Active SOS mobile app look like:
@@ -125,6 +100,8 @@ function classify(body, rules) {
     };
   }
   const freeform = classifyFreeform(body, rules);
+  // Words like "not safe", "trapped" or "need help" are critical even when the organization's own rules do not list them.
+  if (freeform.tier < 3 && classifyReply(body).response === 'SOS') { freeform.tier = 3; freeform.item_type = 'SOS'; }
   return { ...freeform, gps_url: null, lat: null, lng: null, message_body: body, senderName: null, senderPhone: null };
 }
 
@@ -264,13 +241,13 @@ exports.handler = async (event) => {
   if (!isStructured) {
     const reply = classifyReply(body);
     const { data: ack, error: ackError } = await supabase.rpc('record_acknowledgement', {
-      p_org: org.id, p_person: person.id, p_response: reply.response, p_text: body, p_message_sid: params.get('MessageSid') || null,
+      p_org: org.id, p_person: person.id, p_response: (reply.response === 'TEXT' && classified.tier === 3) ? 'SOS' : reply.response, p_text: body, p_message_sid: params.get('MessageSid') || null,
     });
     if (ackError) console.error('sms-webhook: record_acknowledgement failed', ackError);
     else if (ack && ack.matched) {
       if (ack.duplicate) return EMPTY_TWIML;
       if (reply.response === 'SAFE') return EMPTY_TWIML;
-      if (reply.response === 'SOS') { classified.tier = 3; classified.item_type = 'SOS'; }
+      if (reply.response === 'SOS' || classified.tier === 3) { classified.tier = 3; classified.item_type = 'SOS'; }
     }
   }
 
