@@ -2,6 +2,7 @@ import { useEffect, useState, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/AuthContext';
+import { isLiveEvent, kindColor, kindLabel, rollCallSummary, type RollCallSummary } from '../lib/eventLabels.mjs';
 
 // Wraps a stat card in a Link to the filtered Alert History view. Cards for non-alert
 // stats (e.g. active people) should keep using a plain div — only pass `to` when
@@ -21,8 +22,11 @@ function StatCard({ to, children }: { to?: string; children: ReactNode }) {
   );
 }
 
+interface LatestEvent { id: string; kind: string; status: string; created_at: string; queued: number; sending: number }
+
 export default function DashboardHome() {
   const { staff } = useAuth();
+  const [latest, setLatest] = useState<{ ev: LatestEvent; counts: RollCallSummary | null } | null>(null);
   const [counts, setCounts] = useState({
     open: 0,
     tier3Open: 0,
@@ -32,6 +36,16 @@ export default function DashboardHome() {
     tier2Total: 0,
     tier3Total: 0,
   });
+
+  useEffect(() => {
+    (async () => {
+      const { data: evs } = await supabase.rpc('list_recent_events', { p_limit: 1 });
+      const ev = ((evs ?? []) as LatestEvent[])[0];
+      if (!ev) return;
+      const { data: rc } = await supabase.rpc('event_roll_call', { p_event: ev.id });
+      setLatest({ ev, counts: rollCallSummary((rc as { counts?: unknown } | null)?.counts) });
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -68,6 +82,28 @@ export default function DashboardHome() {
     <div>
       <h1>Welcome{staff?.full_name ? `, ${staff.full_name}` : ''}</h1>
       <p style={{ color: 'var(--brand-gray-600)' }}>Organization dashboard</p>
+
+      {latest && (
+        <Link
+          to={`/events/${latest.ev.id}`}
+          className="card"
+          style={{ display: 'block', textDecoration: 'none', color: 'inherit', marginTop: 20, borderLeft: `6px solid ${latest.counts && latest.counts.sos > 0 ? 'var(--tier-3)' : kindColor(latest.ev.kind)}` }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--brand-gray-600)' }}>
+            {isLiveEvent({ createdAt: latest.ev.created_at, status: latest.ev.status, pending: latest.ev.queued + latest.ev.sending }) ? 'Active roll-call' : 'Latest roll-call'}
+            {' · '}{kindLabel(latest.ev.kind)}{' · '}{new Date(latest.ev.created_at).toLocaleString()}
+          </div>
+          {latest.counts && (
+            <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', margin: '10px 0' }}>
+              <span><strong style={{ fontSize: 28, color: 'var(--tier-1)' }}>{latest.counts.safe}</strong> safe</span>
+              <span><strong style={{ fontSize: 28, color: 'var(--tier-3)' }}>{latest.counts.sos}</strong> need help (SOS)</span>
+              <span><strong style={{ fontSize: 28, color: 'var(--accent-orange)' }}>{latest.counts.unaccounted}</strong> unaccounted for</span>
+              <span style={{ color: 'var(--brand-gray-600)' }}>of {latest.counts.targeted} texted</span>
+            </div>
+          )}
+          <span style={{ color: 'var(--brand-teal)', fontWeight: 700 }}>View roll-call &amp; map →</span>
+        </Link>
+      )}
 
       <p style={{ marginTop: 24, marginBottom: 8, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', color: 'var(--brand-gray-600)' }}>
         Needs attention now

@@ -15,7 +15,7 @@ export default function AfterActionPage() {
     });
   }, [id]);
 
-  if (error) return <div><p role="alert" style={{ color: 'var(--tier-3)' }}>{error}</p><Link to="/events">← Sent events</Link></div>;
+  if (error) return <div><p role="alert" style={{ color: 'var(--tier-3)' }}>{error}</p><Link to="/events">← Drills &amp; Emergencies</Link></div>;
   if (!r) return <p>Loading…</p>;
 
   const c = r.counts; const t = r.timeline;

@@ -60,7 +60,7 @@ export default function AppShell() {
           <NavLink to="/history" style={navItemStyle}>Inbox History</NavLink>
           {canDrill(staff) && <NavLink to="/send" style={navItemStyle}>Send</NavLink>}
           <NavLink to="/scenarios" style={navItemStyle}>Scenarios</NavLink>
-          <NavLink to="/events" style={navItemStyle}>Sent Events</NavLink>
+          <NavLink to="/events" style={navItemStyle}>Drills &amp; Emergencies</NavLink>
           <NavLink to="/people" style={navItemStyle}>People</NavLink>
           <NavLink to="/groups" style={navItemStyle}>Groups</NavLink>
           <NavLink to="/settings" style={navItemStyle}>Org Settings</NavLink>

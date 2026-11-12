@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/AuthContext';
 import { canEditRoster } from '../lib/permissions';
+import { kindLabel, latestEventPerScenario } from '../lib/eventLabels.mjs';
 
 interface Scenario { id: string; name: string; kind: 'alert' | 'drill' | 'test'; bodies: { sms?: string }; default_group_ids: string[]; requires_ack: boolean }
 interface Group { id: string; name: string }
+interface LastRun { id: string; scenario_id: string; kind: string; created_at: string }
 const blank = { id: '', name: '', kind: 'alert' as Scenario['kind'], sms: '', groups: [] as string[], ack: true };
 
 export default function ScenariosPage() {
@@ -13,16 +15,19 @@ export default function ScenariosPage() {
   const canEdit = canEditRoster(staff);
   const [rows, setRows] = useState<Scenario[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [lastRun, setLastRun] = useState<Record<string, LastRun>>({});
   const [form, setForm] = useState<typeof blank | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [{ data: s }, { data: g }] = await Promise.all([
+    const [{ data: s }, { data: g }, { data: ev }] = await Promise.all([
       supabase.from('notification_scenarios').select('id, name, kind, bodies, default_group_ids, requires_ack').order('name'),
       supabase.from('groups').select('id, name').order('name'),
+      supabase.from('notification_events').select('id, scenario_id, kind, created_at').not('scenario_id', 'is', null).order('created_at', { ascending: false }).limit(200),
     ]);
     setRows((s ?? []) as Scenario[]);
     setGroups((g ?? []) as Group[]);
+    setLastRun(latestEventPerScenario((ev ?? []) as LastRun[]));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -53,6 +58,7 @@ export default function ScenariosPage() {
       <h1>Scenarios</h1>
       <p style={{ color: 'var(--brand-gray-600)' }}>
         Pre-written messages for situations you plan for. Pick one on the Send page and the message and groups fill in.
+        Each scenario shows the last time it was run, with a link to that roll-call and map.
         The standard wording (Active SOS eMNS, your organization name, DRILL or TEST tag, opt-out line) is added automatically.
       </p>
       {error && <p role="alert" style={{ color: 'var(--tier-3)' }}>{error}</p>}
@@ -98,6 +104,14 @@ export default function ScenariosPage() {
             </div>
             <p style={{ margin: '8px 0' }}>{s.bodies?.sms || <em>No custom text</em>}</p>
             <small style={{ color: 'var(--brand-gray-600)' }}>Groups: {groupNames(s.default_group_ids ?? [])}</small>
+            <div style={{ marginTop: 8, fontSize: 14 }}>
+              {lastRun[s.id] ? (
+                <>
+                  Last run {new Date(lastRun[s.id].created_at).toLocaleString()} ({kindLabel(lastRun[s.id].kind)}){' '}
+                  <Link to={`/events/${lastRun[s.id].id}`} style={{ fontWeight: 700 }}>View roll-call &amp; map →</Link>
+                </>
+              ) : <span style={{ color: 'var(--brand-gray-600)' }}>Not run yet</span>}
+            </div>
           </div>
         ))}
       </div>

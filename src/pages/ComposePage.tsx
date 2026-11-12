@@ -134,7 +134,7 @@ export default function ComposePage() {
   const send = async () => {
     setBusy(true); setError(null);
     try {
-      await callFunction('send-event', {
+      const sent = await callFunction<{ event_id?: string }>('send-event', {
         kind, body, group_ids: selected, requires_ack: ack, scenario_id: scenarioId || undefined, idempotency_key: key,
         channels: order, mode: effectiveMode,
         fallback_after_seconds: effectiveMode === 'fallback' && ack ? Math.round(fallbackMinutes * 60) : undefined,
@@ -142,7 +142,7 @@ export default function ComposePage() {
         voice_max_attempts: usesVoice ? voiceAttempts : undefined,
         voice_retry_seconds: usesVoice ? Math.round(voiceMinutes * 60) : undefined,
       });
-      navigate('/events');
+      navigate(typeof sent.event_id === 'string' ? `/events/${sent.event_id}` : '/events');
     } catch (e) { setError((e as Error).message); setKey(crypto.randomUUID()); setConfirming(false); }
     setBusy(false);
   };

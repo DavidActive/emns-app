@@ -48,7 +48,7 @@ export default function RollCallMap({ people }: { people: PinPerson[] }) {
         <strong>Map</strong>
         <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: PIN_COLORS.sos, marginRight: 5 }} />Needs help (SOS): {counts.sos}</span>
         <span><span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: PIN_COLORS.safe, marginRight: 5 }} />Safe: {counts.safe}</span>
-        <span style={{ color: 'var(--brand-gray-600)' }}>Pins appear when a person answers from the Active SOS app and shares their location.</span>
+        <span style={{ color: 'var(--brand-gray-600)' }}>Pins appear when a person checks in or sends an alert and chooses to share their location.</span>
       </div>
       <div ref={el} role="region" aria-label="Map of responses" style={{ height: 340, borderRadius: 6, background: '#eef1f5' }} />
       {pins.length === 0 && <p style={{ margin: '8px 0 0', color: 'var(--brand-gray-600)', fontSize: 14 }}>No locations yet.</p>}
